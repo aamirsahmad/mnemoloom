@@ -242,6 +242,53 @@ fn ranking_phrase_and_recency() {
 }
 
 #[test]
+fn query_on_chosen_docs_ands_units_and_excludes() {
+    let e = env();
+    let ts = "2026-10-01T00:00:00Z";
+    for (id, text) in [
+        (CLAUDE_ID, "rocket launch window"),
+        (CLAUDE_ID2, "rocket fuel"),
+        (ID3, "launch rocket fuel"),
+    ] {
+        write_claude(&e.homes.claude, id, "/w", &claude_with(id, "/w", text, ts));
+    }
+    let cat = catalog(&e);
+    let doc = |id: &str| cat.rows.iter().find(|r| r.session_id == id).unwrap().doc;
+    let ids_of = |q: &query::TextQuery| -> Vec<String> {
+        let mut v: Vec<String> = q
+            .ranked
+            .iter()
+            .map(|d| {
+                cat.rows
+                    .iter()
+                    .find(|r| r.doc == *d)
+                    .unwrap()
+                    .session_id
+                    .clone()
+            })
+            .collect();
+        v.sort();
+        v
+    };
+    let all = [doc(CLAUDE_ID), doc(CLAUDE_ID2), doc(ID3)];
+    let q = query::run_query_docs(&cat, "rocket launch", "", &all, UNIX_EPOCH);
+    assert_eq!(ids_of(&q), vec![CLAUDE_ID, ID3]);
+    assert_eq!(q.scores.len(), 2);
+    // The phrase ranks first.
+    assert_eq!(q.ranked[0], doc(CLAUDE_ID));
+    assert!(q.scores[0] > q.scores[1]);
+    // Only the chosen documents are scored.
+    let q = query::run_query_docs(&cat, "rocket", "", &[doc(ID3)], UNIX_EPOCH);
+    assert_eq!(ids_of(&q), vec![ID3]);
+    let q = query::run_query_docs(&cat, "rocket", "fuel \"no such\"", &all, UNIX_EPOCH);
+    assert_eq!(ids_of(&q), vec![CLAUDE_ID]);
+    let q = query::run_query_docs(&cat, "\"window rocket\"", "", &all, UNIX_EPOCH);
+    assert!(q.ranked.is_empty());
+    let s = q.snippet(&cat, &cat.searcher(), doc(CLAUDE_ID));
+    assert!(s.text.contains("rocket launch window"), "{}", s.text);
+}
+
+#[test]
 fn snippets_are_plain_text() {
     let e = env();
     write_claude(

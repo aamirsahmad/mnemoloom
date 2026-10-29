@@ -204,7 +204,7 @@ fn flat(s: &str) -> String {
 }
 
 /// A snippet on one line, cut to `max` cells at a word boundary.
-pub(super) fn snippet_spans(s: &Snippet, max: usize, base: Style, hl: Style) -> Vec<Span<'static>> {
+pub fn snippet_spans(s: &Snippet, max: usize, base: Style, hl: Style) -> Vec<Span<'static>> {
     let flat = flat(&s.text);
     let row = wrap_ranges(&flat, max).swap_remove(0);
     spans(&flat, row, base, &[(&s.highlights, hl)])

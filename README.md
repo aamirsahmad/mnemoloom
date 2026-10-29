@@ -39,7 +39,7 @@ cargo install mnemoloom
 Or install a binary from [GitHub Releases](https://github.com/aamirsahmad/mnemoloom/releases):
 
 ```bash
-v=v0.1.0
+v=v0.2.0
 t=aarch64-apple-darwin   # or x86_64-apple-darwin, x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu
 curl -LO "https://github.com/aamirsahmad/mnemoloom/releases/download/$v/mnemoloom-$v-$t.tar.gz"
 tar -xzf "mnemoloom-$v-$t.tar.gz"
@@ -142,6 +142,26 @@ It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
 | `p` | In the list: show or hide the preview. |
 | `r` | In the list: refresh. |
 | `?` | In the list: show all keys. |
+
+The filter finds text in the agent fields and in the agent conversations.
+The fields are the name, pane, kind, state, directory, repository, branch, model, session ID and status line.
+The conversations come from the `mnemoloom search` index.
+When you open mux, mux updates the index in the background.
+Until the index is ready, the filter line shows `indexing…` and mux finds text in the fields only.
+
+| Filter | Shows the agents that |
+|---|---|
+| `word` | Contain `word`. |
+| `a b` | Contain `a` and `b`. |
+| `"a b"` | Contain the phrase `a b`. |
+| `!word` | Do not contain `word`. |
+| `~word` | Contain the letters of `word` in sequence, in one field. |
+| `Word` | Contain `Word`, with the same case. A word with an uppercase letter is case-sensitive. |
+
+An agent shows when all words and phrases are in its fields, or all of them are in its conversation.
+`!` and `~` words apply to the fields. A `!` word also removes conversation matches that contain it.
+Conversation matches show a line from the conversation below the agent.
+Agents with field matches show first, then the best conversation matches.
 
 Use `mnemoloom mux list` for a table, and `mnemoloom mux list --json` for JSON.
 

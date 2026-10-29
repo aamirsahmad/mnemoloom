@@ -8,7 +8,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Context;
 use tantivy::collector::TopDocs;
 use tantivy::columnar::StrColumn;
-use tantivy::query::{BooleanQuery, BoostQuery, Occur, PhraseQuery, Query, TermQuery};
+use tantivy::query::{
+    BooleanQuery, BoostQuery, EnableScoring, Occur, PhraseQuery, Query, TermQuery,
+};
 use tantivy::schema::{IndexRecordOption, Term, Value};
 use tantivy::{DocAddress, Index, IndexReader, ReloadPolicy, Searcher, TantivyDocument};
 
@@ -425,6 +427,8 @@ pub struct TextQuery {
     base: Box<dyn Query>,
     /// Ranked documents (best first).
     pub ranked: Vec<DocAddress>,
+    /// Recency-weighted score of each `ranked` document.
+    pub scores: Vec<f64>,
 }
 
 /// Split input into units: `"quoted"` segments and whitespace words.
@@ -466,12 +470,14 @@ fn terms_query(mut terms: Vec<Term>) -> Box<dyn Query> {
 
 /// Text query over `content`: each unit matches as a term, or as a phrase
 /// when it tokenizes to several terms (`"a b"`, `std::fs`,
-/// `localhost:8080`); units are OR-ed. Returns (base, boosted): the
-/// boosted form adds the whole input's tokens as a 5x phrase.
+/// `localhost:8080`); units are OR-ed (`Occur::Should`) or AND-ed
+/// (`Occur::Must`). Returns (base, boosted): the boosted form adds the
+/// whole input's tokens as a 5x phrase.
 fn content_query(
     index: &Index,
     field: tantivy::schema::Field,
     raw: &str,
+    unit: Occur,
 ) -> (Box<dyn Query>, Box<dyn Query>) {
     let mut all = Vec::new();
     let mut units: Vec<(Occur, Box<dyn Query>)> = Vec::new();
@@ -481,7 +487,7 @@ fn content_query(
             continue;
         }
         all.extend(t.iter().cloned());
-        units.push((Occur::Should, terms_query(t)));
+        units.push((unit, terms_query(t)));
     }
     let base: Box<dyn Query> = Box::new(BooleanQuery::new(units));
     if all.len() < 2 {
@@ -500,7 +506,7 @@ fn content_query(
 /// recency-weighted re-rank.
 pub fn run_query(cat: &Catalog, raw: &str, f: &Filters, now: SystemTime) -> TextQuery {
     let fields = cat.fields;
-    let (base, content) = content_query(&cat.index, fields.content, raw);
+    let (base, content) = content_query(&cat.index, fields.content, raw, Occur::Should);
     let term = |field, v: &str| -> Box<dyn Query> {
         Box::new(TermQuery::new(
             Term::from_field_text(field, v),
@@ -527,6 +533,66 @@ pub fn run_query(cat: &Catalog, raw: &str, f: &Filters, now: SystemTime) -> Text
     let hits = searcher
         .search(&query, &TopDocs::with_limit(TOP_HITS).order_by_score())
         .unwrap_or_default();
+    ranked(cat, raw, base, hits, now)
+}
+
+/// [`run_query`] over a chosen set of documents (no filters, no
+/// [`TOP_HITS`] cap): every unit of `raw` must match, and no document
+/// containing a unit of `exclude` matches. Same scoring and phrase boost.
+pub fn run_query_docs(
+    cat: &Catalog,
+    raw: &str,
+    exclude: &str,
+    docs: &[DocAddress],
+    now: SystemTime,
+) -> TextQuery {
+    let field = cat.fields.content;
+    let (base, content) = content_query(&cat.index, field, raw, Occur::Must);
+    let mut clauses = vec![(Occur::Must, content)];
+    if !query_units(exclude).is_empty() {
+        let (any, _) = content_query(&cat.index, field, exclude, Occur::Should);
+        clauses.push((Occur::MustNot, any));
+    }
+    let searcher = cat.searcher();
+    let hits = score_docs(&searcher, &BooleanQuery::new(clauses), docs).unwrap_or_default();
+    ranked(cat, raw, base, hits, now)
+}
+
+/// Score of each of `docs` that `query` matches.
+fn score_docs(
+    searcher: &Searcher,
+    query: &dyn Query,
+    docs: &[DocAddress],
+) -> tantivy::Result<Vec<(f32, DocAddress)>> {
+    let weight = query.weight(EnableScoring::enabled_from_searcher(searcher))?;
+    let mut docs = docs.to_vec();
+    docs.sort();
+    docs.dedup();
+    let mut hits = Vec::new();
+    for seg in docs.chunk_by(|a, b| a.segment_ord == b.segment_ord) {
+        let ord = seg[0].segment_ord;
+        let mut scorer = weight.scorer(searcher.segment_reader(ord), 1.0)?;
+        for d in seg {
+            // Seeking only moves forward; `docs` are sorted.
+            if scorer.doc() < d.doc_id {
+                scorer.seek(d.doc_id);
+            }
+            if scorer.doc() == d.doc_id {
+                hits.push((scorer.score(), *d));
+            }
+        }
+    }
+    Ok(hits)
+}
+
+/// Recency-weighted re-rank of raw hits.
+fn ranked(
+    cat: &Catalog,
+    raw: &str,
+    base: Box<dyn Query>,
+    hits: Vec<(f32, DocAddress)>,
+    now: SystemTime,
+) -> TextQuery {
     let ts_by_doc: HashMap<DocAddress, u64> =
         cat.rows.iter().map(|r| (r.doc, r.modified_ts)).collect();
     let now_ms = now
@@ -544,6 +610,7 @@ pub fn run_query(cat: &Catalog, raw: &str, f: &Filters, now: SystemTime) -> Text
     TextQuery {
         raw: raw.to_string(),
         base,
+        scores: scored.iter().map(|s| s.0).collect(),
         ranked: scored.into_iter().map(|(_, d)| d).collect(),
     }
 }

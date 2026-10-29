@@ -1,12 +1,21 @@
 //! Picker state and key handling, independent of the terminal.
 
+use std::time::{Duration, Instant};
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 use ratatui::widgets::ListState;
 
-use super::{ansi, fuzzy};
+use super::ansi;
+use super::matcher::{Filter, Haystack};
+use super::search::{Hit, Hits, Request};
 use crate::mux::model::Agent;
-use crate::mux::render;
+
+/// Quiet time after the last keystroke before the conversation search runs.
+pub const DEBOUNCE: Duration = Duration::from_millis(150);
+/// Rank bonus for matching on metadata: such agents list before
+/// conversation-only matches.
+const META_BONUS: f64 = 1e6;
 
 /// Which part of the picker takes typed keys.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,11 +37,26 @@ pub enum Action {
 
 pub struct App {
     pub agents: Vec<Agent>,
-    /// Plain row text per agent, the filter haystack.
-    rows: Vec<String>,
+    /// Searchable metadata per agent.
+    haystacks: Vec<Haystack>,
     pub query: String,
-    /// Indices into `agents` that match `query`, in urgency order.
+    filter: Filter,
+    /// Indices into `agents` that match `query`: best match first, then
+    /// urgency order.
     pub visible: Vec<usize>,
+    /// Conversation hits for `query`, by lowercase session id.
+    hits: Hits,
+    /// Bumped whenever `hits` need a new search; replies for an older
+    /// value are stale.
+    seq: u64,
+    /// When the search for `seq` is due (`None`: sent, or nothing to send).
+    due: Option<Instant>,
+    /// The conversation index is open.
+    pub index_ready: bool,
+    /// The background index update is running.
+    pub indexing: bool,
+    /// The selection follows the best match (no move since the last edit).
+    follow: bool,
     pub list: ListState,
     pub preview_pane: String,
     pub preview: Vec<Line<'static>>,
@@ -55,9 +79,16 @@ impl App {
     pub fn new(agents: Vec<Agent>) -> Self {
         let mut app = App {
             agents: Vec::new(),
-            rows: Vec::new(),
+            haystacks: Vec::new(),
             query: String::new(),
+            filter: Filter::default(),
             visible: Vec::new(),
+            hits: Hits::new(),
+            seq: 0,
+            due: None,
+            index_ready: false,
+            indexing: false,
+            follow: true,
             list: ListState::default(),
             preview_pane: String::new(),
             preview: Vec::new(),
@@ -77,8 +108,76 @@ impl App {
     /// still listed, the highlighted pane.
     pub fn set_agents(&mut self, agents: Vec<Agent>) {
         let keep = self.selected_pane().map(str::to_owned);
-        self.rows = agents.iter().map(|a| render::row(a, false)).collect();
+        self.haystacks = agents.iter().map(Haystack::of).collect();
         self.agents = agents;
+        self.refilter(keep.as_deref());
+        // New sessions may match; the current hits stay until then.
+        self.schedule(Instant::now());
+    }
+
+    /// The index opened (or is gone): search it now, or drop its hits.
+    pub fn set_index_ready(&mut self, ready: bool) {
+        self.index_ready = ready;
+        if ready {
+            self.schedule(Instant::now());
+        } else if !self.hits.is_empty() {
+            self.hits.clear();
+            self.refilter_follow();
+        }
+    }
+
+    /// The conversation search to start now, if one is due.
+    pub fn search_due(&mut self, now: Instant) -> Option<Request> {
+        if self.due.is_none_or(|t| t > now) {
+            return None;
+        }
+        self.due = None;
+        let conversation = self.filter.conversation().filter(|_| self.index_ready)?;
+        let sessions: Vec<String> = self
+            .agents
+            .iter()
+            .filter(|a| !a.session_id.is_empty())
+            .map(|a| a.session_id.clone())
+            .collect();
+        (!sessions.is_empty()).then_some(Request {
+            seq: self.seq,
+            conversation,
+            sessions,
+        })
+    }
+
+    /// Apply a search reply; a stale one (the query, agents or index
+    /// changed since it was asked) is dropped. Returns whether it applied.
+    pub fn set_hits(&mut self, seq: u64, hits: Hits) -> bool {
+        if seq != self.seq {
+            return false;
+        }
+        self.hits = hits;
+        self.refilter_follow();
+        true
+    }
+
+    /// The selected agent's conversation hit, if any.
+    pub fn hit(&self, agent: &Agent) -> Option<&Hit> {
+        if agent.session_id.is_empty() {
+            return None;
+        }
+        self.hits.get(&agent.session_id.to_lowercase())
+    }
+
+    /// Ask for a new search at `at`; replies to earlier ones become stale.
+    fn schedule(&mut self, at: Instant) {
+        self.seq += 1;
+        self.due = Some(at);
+    }
+
+    /// Refilter; keep the highlighted pane unless it follows the best match.
+    fn refilter_follow(&mut self) {
+        let keep = if self.follow {
+            None
+        } else {
+            self.selected_pane().map(str::to_owned)
+        };
         self.refilter(keep.as_deref());
     }
 
@@ -100,10 +199,23 @@ impl App {
         self.preview_pane = pane;
     }
 
+    /// An agent is shown when no `!exclusion` and every `~fuzzy` term allow
+    /// it, and either every plain term matches its metadata or its
+    /// conversation matches them all. Rank: conversation score plus
+    /// [`META_BONUS`] for a metadata match; ties keep urgency order.
     fn refilter(&mut self, keep: Option<&str>) {
-        self.visible = (0..self.agents.len())
-            .filter(|&i| fuzzy::matches(&self.query, &self.rows[i]))
+        let mut ranked: Vec<(f64, usize)> = (0..self.agents.len())
+            .filter_map(|i| {
+                let meta = self.filter.meta(&self.haystacks[i]);
+                let hit = self.hit(&self.agents[i]);
+                let shown = meta.allowed && (meta.matched || hit.is_some());
+                let bonus = if meta.matched { META_BONUS } else { 0.0 };
+                shown.then(|| (bonus + hit.map_or(0.0, |h| h.score), i))
+            })
             .collect();
+        // Stable: equal scores keep urgency order.
+        ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
+        self.visible = ranked.into_iter().map(|(_, i)| i).collect();
         let position = keep.and_then(|pane| {
             self.visible
                 .iter()
@@ -118,8 +230,17 @@ impl App {
     }
 
     fn edit_query(&mut self, edit: impl FnOnce(&mut String)) {
+        let before = self.query.clone();
         edit(&mut self.query);
+        if self.query == before {
+            return;
+        }
+        self.filter = Filter::parse(&self.query);
+        // Hits belong to the old query; metadata matches show at once.
+        self.hits.clear();
+        self.schedule(Instant::now() + DEBOUNCE);
         // Typing jumps to the best (first) match, as fzf does.
+        self.follow = true;
         self.refilter(None);
     }
 
@@ -130,6 +251,7 @@ impl App {
         let last = self.visible.len().saturating_sub(1);
         self.list
             .select(Some(current.saturating_add_signed(delta).min(last)));
+        self.follow = false;
     }
 
     pub fn on_key(&mut self, key: KeyEvent) -> Action {
@@ -224,6 +346,7 @@ fn delete_word(query: &mut String) {
 mod tests {
     use super::*;
     use crate::mux::model::{Kind, State};
+    use mnemoloom::index::snippet::Snippet;
 
     fn agent(pane: &str, state: State, name: &str) -> Agent {
         let mut a = Agent::new(pane.into(), "s".into(), Kind::Claude);
@@ -380,6 +503,154 @@ mod tests {
             app.wide = wide;
             assert!(app.show_preview());
         }
+    }
+
+    fn hit(score: f64, text: &str) -> Hit {
+        Hit {
+            score,
+            snippet: Snippet {
+                text: text.into(),
+                highlights: Vec::new(),
+            },
+        }
+    }
+
+    /// `sample()` with session ids, plus one agent without.
+    fn with_sessions() -> App {
+        let mut agents = sample();
+        for (a, id) in agents.iter_mut().zip(["A-1", "b-2", "c-3"]) {
+            a.session_id = id.into();
+        }
+        agents.push(agent("d:1.1", State::Idle, "no session"));
+        let mut app = App::new(agents);
+        app.set_index_ready(true);
+        app
+    }
+
+    fn later() -> Instant {
+        Instant::now() + DEBOUNCE
+    }
+
+    #[test]
+    fn conversation_search_is_debounced() {
+        let mut app = with_sessions();
+        // Nothing to ask without plain terms.
+        assert_eq!(app.search_due(later()), None);
+        type_str(&mut app, "rocket");
+        assert_eq!(app.search_due(Instant::now()), None);
+        let req = app.search_due(later()).unwrap();
+        assert_eq!(req.conversation.query, "rocket");
+        assert_eq!(req.sessions, vec!["A-1", "b-2", "c-3"]);
+        // Sent once.
+        assert_eq!(app.search_due(later()), None);
+        // Each keystroke restarts the wait and supersedes the request.
+        type_str(&mut app, " x");
+        let next = app.search_due(later()).unwrap();
+        assert!(next.seq > req.seq);
+        assert_eq!(next.conversation.query, "rocket x");
+        // Fuzzy-only and exclusion-only queries stay on metadata.
+        app.on_key(ctrl('u'));
+        type_str(&mut app, "~dpl !busy");
+        assert_eq!(app.search_due(later()), None);
+    }
+
+    #[test]
+    fn no_search_until_the_index_is_ready() {
+        let mut app = App::new(sample());
+        app.agents[0].session_id = "a-1".into();
+        type_str(&mut app, "rocket");
+        assert_eq!(app.search_due(later()), None);
+        app.set_index_ready(true);
+        assert!(app.search_due(Instant::now()).is_some());
+    }
+
+    #[test]
+    fn hits_add_conversation_matches_and_rank() {
+        let mut app = with_sessions();
+        type_str(&mut app, "rocket");
+        assert!(app.visible.is_empty());
+        let req = app.search_due(later()).unwrap();
+        let hits = Hits::from([
+            ("b-2".into(), hit(1.0, "rocket")),
+            ("c-3".into(), hit(3.0, "rocket")),
+        ]);
+        assert!(app.set_hits(req.seq, hits));
+        // Best score first; the selection follows it.
+        assert_eq!(app.visible, vec![2, 1]);
+        assert_eq!(app.selected_pane(), Some("c:1.1"));
+        assert_eq!(app.hit(&app.agents[1]).unwrap().score, 1.0);
+        assert!(app.hit(&app.agents[3]).is_none());
+        app.on_key(ctrl('u'));
+        type_str(&mut app, "deploy");
+        let req = app.search_due(later()).unwrap();
+        // Hits are keyed by lowercase session id ("A-1" here).
+        let hits = Hits::from([
+            ("a-1".into(), hit(9.0, "deploy")),
+            ("b-2".into(), hit(2.0, "deploy")),
+        ]);
+        assert!(app.set_hits(req.seq, hits));
+        // Metadata matches (a, c) list first, the higher score leading;
+        // then conversation-only (b).
+        assert_eq!(app.visible, vec![0, 2, 1]);
+    }
+
+    #[test]
+    fn stale_hits_are_discarded() {
+        let mut app = with_sessions();
+        type_str(&mut app, "rocket");
+        let req = app.search_due(later()).unwrap();
+        type_str(&mut app, "s");
+        let hits = Hits::from([("b-2".into(), hit(1.0, "rocket"))]);
+        assert!(!app.set_hits(req.seq, hits.clone()));
+        assert!(app.visible.is_empty());
+        // A rescan supersedes a request too, but keeps current hits.
+        let req = app.search_due(later()).unwrap();
+        assert!(app.set_hits(req.seq, hits.clone()));
+        assert_eq!(app.visible, vec![1]);
+        let agents = app.agents.clone();
+        app.set_agents(agents);
+        assert_eq!(app.visible, vec![1]);
+        assert!(!app.set_hits(req.seq, Hits::new()));
+        assert_eq!(app.visible, vec![1]);
+        // Editing drops hits at once.
+        app.on_key(key(KeyCode::Backspace));
+        assert!(app.visible.is_empty());
+        // So does losing the index.
+        type_str(&mut app, "s");
+        let req = app.search_due(later()).unwrap();
+        assert!(app.set_hits(req.seq, hits));
+        app.set_index_ready(false);
+        assert!(app.visible.is_empty());
+    }
+
+    #[test]
+    fn exclusions_and_fuzzy_terms_gate_hits() {
+        let mut app = with_sessions();
+        type_str(&mut app, "rocket !idle");
+        let req = app.search_due(later()).unwrap();
+        assert_eq!(req.conversation.exclude, "idle");
+        let hits = Hits::from([("b-2".into(), hit(1.0, "x")), ("c-3".into(), hit(2.0, "x"))]);
+        assert!(app.set_hits(req.seq, hits.clone()));
+        // c is idle: its metadata excludes it whatever the conversation says.
+        assert_eq!(app.visible, vec![1]);
+        app.on_key(ctrl('u'));
+        type_str(&mut app, "rocket ~dpdc");
+        let req = app.search_due(later()).unwrap();
+        assert!(app.set_hits(req.seq, hits));
+        assert_eq!(app.visible, vec![2]);
+    }
+
+    #[test]
+    fn hits_keep_a_moved_selection() {
+        let mut app = with_sessions();
+        type_str(&mut app, "deploy");
+        app.on_key(key(KeyCode::Down));
+        assert_eq!(app.selected_pane(), Some("c:1.1"));
+        let req = app.search_due(later()).unwrap();
+        let hits = Hits::from([("b-2".into(), hit(5.0, "x"))]);
+        assert!(app.set_hits(req.seq, hits));
+        assert_eq!(app.visible, vec![0, 2, 1]);
+        assert_eq!(app.selected_pane(), Some("c:1.1"));
     }
 
     #[test]

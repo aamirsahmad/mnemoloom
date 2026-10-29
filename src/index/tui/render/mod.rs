@@ -9,6 +9,8 @@ mod overlay;
 mod preview;
 mod results;
 
+pub use results::snippet_spans;
+
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::Path;

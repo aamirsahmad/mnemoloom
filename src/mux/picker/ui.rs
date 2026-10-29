@@ -2,6 +2,8 @@
 //! PREVIEW pane (agent header + live pane capture), a mode footer and a
 //! key-help overlay.
 
+use std::borrow::Cow;
+
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::Style;
@@ -10,6 +12,8 @@ use ratatui::widgets::{
     Block, BorderType, Clear, HighlightSpacing, List, ListItem, Padding, Paragraph,
 };
 
+use mnemoloom::index::snippet::Snippet;
+use mnemoloom::index::tui::render::snippet_spans;
 use mnemoloom::index::tui::text::{fit, suffix, width};
 use mnemoloom::theme;
 
@@ -29,6 +33,8 @@ const ROW_AGE: usize = 6;
 const REPO: usize = 22;
 /// Narrowest name column before the repo column is dropped.
 const MIN_NAME: usize = 16;
+/// Cells of context kept before a snippet's first matched term.
+const SNIPPET_LEAD: usize = 16;
 
 const AGENT_HINTS: &[(&str, &str)] = &[
     ("⏎", "attach"),
@@ -42,6 +48,7 @@ const FILTER_HINTS: &[(&str, &str)] = &[
     ("↑/↓", "move"),
     ("tab", "agents"),
     ("^u", "clear"),
+    ("\"…\" !x ~x", "phrase/not/fuzzy"),
 ];
 const HELP: &[(&str, &str)] = &[
     ("⏎", "attach to the highlighted agent's pane"),
@@ -52,6 +59,17 @@ const HELP: &[(&str, &str)] = &[
     ("r ^r", "rescan agents"),
     ("p", "toggle the preview"),
     ("^u ^w ⌫", "clear filter / delete word / char"),
+    ("", ""),
+    (
+        "word",
+        "filter: text in name, cwd, repo, branch, model, id…",
+    ),
+    ("", "  or in the conversation (search index)"),
+    ("a b", "all words must match"),
+    ("\"a b\"", "exact phrase"),
+    ("!word", "exclude agents that contain it"),
+    ("~word", "fuzzy match (letters in order)"),
+    ("Word", "an uppercase letter makes the word case-sensitive"),
     ("?", "this help (any key closes)"),
     ("q esc ^c", "quit (esc in an empty filter quits too)"),
     ("", ""),
@@ -133,6 +151,9 @@ fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
     if app.scanning {
         right.push(Span::styled("refreshing…  ", theme::dim()));
     }
+    if app.indexing && !app.index_ready {
+        right.push(Span::styled("indexing…  ", theme::dim()));
+    }
     right.extend(state_counts(&app.agents));
     let right = Line::from(right);
     let [input, status] =
@@ -185,15 +206,29 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
     }
     // One cell goes to the selection bar.
     let row_width = (area.width as usize).saturating_sub(1);
+    let selected = app.list.selected();
     let items: Vec<ListItem> = app
         .visible
         .iter()
-        .map(|&i| ListItem::new(row_line(&app.agents[i], row_width)))
+        .enumerate()
+        .map(|(n, &i)| {
+            let agent = &app.agents[i];
+            let mut lines = vec![row_line(agent, row_width)];
+            lines.extend(app.hit(agent).map(|h| snippet_line(&h.snippet, row_width)));
+            let item = ListItem::new(lines);
+            // An item style goes under the spans, so highlighted terms keep
+            // their background on the selected row.
+            if selected == Some(n) {
+                item.style(Style::new().bg(theme::BG_SEL))
+            } else {
+                item
+            }
+        })
         .collect();
     let list = List::new(items)
         .highlight_symbol(Span::styled("▌", theme::heading()))
         .highlight_spacing(HighlightSpacing::Always)
-        .highlight_style(Style::new().bg(theme::BG_SEL));
+        .repeat_highlight_symbol(true);
     frame.render_stateful_widget(list, area, &mut app.list);
 }
 
@@ -231,6 +266,50 @@ fn row_line(agent: &Agent, cells: usize) -> Line<'static> {
     }
     spans.push(Span::styled(format!(" {:>5}", age(agent)), theme::dim()));
     Line::from(spans)
+}
+
+/// `…snippet` of a conversation match under its row, aligned with the name
+/// when there is room; matched terms highlighted.
+fn snippet_line(snippet: &Snippet, cells: usize) -> Line<'static> {
+    let indent = if cells >= ROW_LEAD + MIN_NAME {
+        ROW_LEAD
+    } else {
+        2
+    };
+    let soft = Style::new().fg(theme::FG_SOFT);
+    let mut spans = vec![Span::raw(" ".repeat(indent)), Span::styled("…", soft)];
+    let room = cells.saturating_sub(indent + 1);
+    if room > 0 {
+        let snippet = in_view(snippet, room);
+        spans.extend(snippet_spans(&snippet, room, soft, theme::hit()));
+    }
+    Line::from(spans)
+}
+
+/// `snippet`, starting shortly before its first matched term when that
+/// term would end past `room` cells.
+fn in_view(snippet: &Snippet, room: usize) -> Cow<'_, Snippet> {
+    let Some(first) = snippet.highlights.first() else {
+        return Cow::Borrowed(snippet);
+    };
+    if width(&snippet.text[..first.end]) <= room {
+        return Cow::Borrowed(snippet);
+    }
+    let lead = suffix(&snippet.text[..first.start], SNIPPET_LEAD);
+    // Start at a word when the lead holds a word break.
+    let lead = match lead.find(char::is_whitespace) {
+        Some(i) => lead[i..].trim_start(),
+        None => lead,
+    };
+    let start = first.start - lead.len();
+    Cow::Owned(Snippet {
+        text: snippet.text[start..].to_owned(),
+        highlights: snippet
+            .highlights
+            .iter()
+            .map(|r| r.start - start..r.end - start)
+            .collect(),
+    })
 }
 
 /// `repo@branch`, or whichever half is known.
@@ -623,6 +702,87 @@ mod tests {
         assert!(screen.contains("1/2"));
         assert!(screen.contains("OPC opencode task"));
         assert!(!screen.contains("PI  pi task"));
+    }
+
+    #[test]
+    fn conversation_hit_shows_a_snippet_under_its_row() {
+        use std::time::Instant;
+
+        use crate::mux::picker::search::{Hit, Hits};
+
+        let mut app = app();
+        app.indexing = true;
+        assert!(render(&mut app, 140, 36).contains("indexing…"));
+        app.set_index_ready(true);
+        assert!(!render(&mut app, 140, 36).contains("indexing…"));
+        for c in "rocket".chars() {
+            press(&mut app, KeyCode::Char(c));
+        }
+        let later = Instant::now() + crate::mux::picker::app::DEBOUNCE;
+        let req = app.search_due(later).unwrap();
+        let text = "we moved the rocket launch to friday";
+        let start = text.find("rocket").unwrap();
+        let snippet = Snippet {
+            text: text.into(),
+            highlights: std::iter::once(start..start + 6).collect(),
+        };
+        let hits = Hits::from([(
+            "0123abcd-4567-4e89".to_owned(),
+            Hit {
+                score: 1.0,
+                snippet,
+            },
+        )]);
+        assert!(app.set_hits(req.seq, hits));
+        let mut terminal = Terminal::new(TestBackend::new(140, 36)).unwrap();
+        terminal.draw(|frame| draw(frame, &mut app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..36)
+            .map(|y| (0..70).map(|x| buffer[(x, y)].symbol()).collect())
+            .collect();
+        let row = rows
+            .iter()
+            .position(|r| r.contains("CLD Add CLI access"))
+            .unwrap();
+        // All three agents share the session id in this fixture.
+        assert!(
+            rows[row + 1].contains("…we moved the rocket launch to friday"),
+            "{}",
+            rows[row + 1]
+        );
+        // Aligned with the name column.
+        let col = |line: &str, pat: &str| line[..line.find(pat).unwrap()].chars().count() as u16;
+        assert_eq!(col(&rows[row + 1], "…"), col(&rows[row], "Add"));
+        let x = col(&rows[row + 1], "rocket");
+        assert_eq!(buffer[(x, row as u16 + 1)].style().bg, theme::hit().bg);
+        // The rest of the selected card keeps the selection background.
+        let before = buffer[(x - 2, row as u16 + 1)].style();
+        assert_eq!(
+            (before.fg, before.bg),
+            (Some(theme::FG_SOFT), Some(theme::BG_SEL))
+        );
+        assert_eq!(buffer[(x - 2, row as u16 + 1)].fg, theme::FG_SOFT);
+    }
+
+    #[test]
+    fn snippet_keeps_the_first_match_in_view() {
+        let text = format!("{}the needle here and more", "word ".repeat(30));
+        let start = text.find("needle").unwrap();
+        let s = Snippet {
+            text: text.clone(),
+            highlights: vec![start..start + 6, start + 7..start + 11],
+        };
+        let shown = in_view(&s, 40);
+        assert_eq!(shown.text, "word word the needle here and more");
+        assert_eq!(&shown.text[shown.highlights[0].clone()], "needle");
+        assert_eq!(&shown.text[shown.highlights[1].clone()], "here");
+        // Already in view, or nothing highlighted: unchanged.
+        assert!(matches!(in_view(&s, 200), Cow::Borrowed(_)));
+        let plain = Snippet {
+            text,
+            highlights: Vec::new(),
+        };
+        assert!(matches!(in_view(&plain, 10), Cow::Borrowed(_)));
     }
 
     #[test]

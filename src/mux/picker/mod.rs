@@ -1,16 +1,18 @@
-//! Native interactive picker: urgency-ordered rows, type-to-filter, a live
-//! preview of the highlighted pane, and a background rescan.
+//! Native interactive picker: urgency-ordered rows, type-to-filter over
+//! metadata and conversations (see [`matcher`], [`search`]), a live preview
+//! of the highlighted pane, and a background rescan.
 
 mod ansi;
 mod app;
-mod fuzzy;
+mod matcher;
+mod search;
 mod ui;
 
 use std::any::Any;
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use crossterm::event::{self, Event, KeyEventKind};
@@ -49,6 +51,12 @@ fn event_loop(
         app.scanning = true;
         spawn_scan(scan_tx.clone());
     }
+    let index = search::default_index();
+    let searcher = index
+        .clone()
+        .map(|(dir, homes)| search::Searcher::spawn(dir, homes));
+    let updated = index.map(|(dir, homes)| search::spawn_update(dir, homes));
+    app.indexing = updated.is_some();
     let mut target: Option<String> = None;
     loop {
         if app.selected_pane() != target.as_deref() {
@@ -81,6 +89,29 @@ fn event_loop(
         }
         while let Ok((pane, text)) = preview.results.try_recv() {
             app.set_preview(pane, &text);
+        }
+        let Some(searcher) = &searcher else {
+            continue;
+        };
+        if let Some(Ok(done)) = updated.as_ref().map(Receiver::try_recv) {
+            app.indexing = false;
+            match done {
+                Ok(stats) if stats.changed() || !app.index_ready => searcher.reload(),
+                Ok(_) => {}
+                Err(err) => app.error = Some(format!("index update failed: {err}")),
+            }
+        }
+        while let Ok(reply) = searcher.replies.try_recv() {
+            match reply {
+                search::Reply::Ready(ready) => app.set_index_ready(ready),
+                search::Reply::Hits(seq, hits) => {
+                    app.set_hits(seq, hits);
+                }
+                search::Reply::Failed(err) => app.error = Some(err),
+            }
+        }
+        if let Some(request) = app.search_due(Instant::now()) {
+            searcher.query(request);
         }
     }
 }

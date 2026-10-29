@@ -236,7 +236,9 @@ mod tests {
         assert!(held.is_some());
         assert!(lock(&d, LockWait::Try).unwrap().is_none());
         drop(held);
-        assert!(lock(&d, LockWait::Try).unwrap().is_some());
+        // Block, not Try: a child that a parallel test is spawning can hold a
+        // copy of the lock fd until it execs.
+        assert!(lock(&d, LockWait::Block).unwrap().is_some());
         let foreign = dir.path().join("foreign");
         fs::create_dir(&foreign).unwrap();
         fs::write(foreign.join("meta.json"), "{}").unwrap();
