@@ -479,7 +479,7 @@ mod tests {
     fn write(h: &Homes, id: &str, ts: &str) -> PathBuf {
         let lines: Vec<String> = claude_lines(id, "/w")
             .into_iter()
-            .map(|l| l.replace("2026-10-27T03:30:00.000Z", ts))
+            .map(|l| l.replace("2026-01-03T03:30:00.000Z", ts))
             .collect();
         write_claude(&h.claude, id, "/w", &lines)
     }
@@ -539,7 +539,7 @@ mod tests {
         ] {
             let lines: Vec<String> = claude_lines(id, cwd)
                 .into_iter()
-                .map(|l| l.replace("2026-10-27T03:30:00.000Z", ts))
+                .map(|l| l.replace("2026-01-03T03:30:00.000Z", ts))
                 .collect();
             write_claude(&homes.claude, id, cwd, &lines);
         }

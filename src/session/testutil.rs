@@ -19,14 +19,14 @@ pub fn claude_lines(id: &str, cwd: &str) -> Vec<String> {
     );
     vec![
         format!(r#"{{"type":"permission-mode","permissionMode":"bypassPermissions","sessionId":"{id}"}}"#),
-        r#"{"type":"file-history-snapshot","messageId":"6505","snapshot":{"messageId":"6505","trackedFileBackups":{},"timestamp":"2026-10-27T03:28:00.000Z"},"isSnapshotUpdate":false}"#.to_string(),
-        format!(r#"{{"parentUuid":null,{env},"type":"user","isMeta":true,"message":{{"role":"user","content":"<command-name>/clear</command-name>"}},"uuid":"u0","timestamp":"2026-10-27T03:28:25.917Z"}}"#),
-        format!(r#"{{"parentUuid":"u0",{env},"type":"user","message":{{"role":"user","content":"fix the failing spec in user_spec.rb"}},"uuid":"u1","timestamp":"2026-10-27T03:28:26.000Z"}}"#),
+        r#"{"type":"file-history-snapshot","messageId":"1001","snapshot":{"messageId":"1001","trackedFileBackups":{},"timestamp":"2026-01-03T03:28:00.000Z"},"isSnapshotUpdate":false}"#.to_string(),
+        format!(r#"{{"parentUuid":null,{env},"type":"user","isMeta":true,"message":{{"role":"user","content":"<command-name>/clear</command-name>"}},"uuid":"u0","timestamp":"2026-01-03T03:28:25.917Z"}}"#),
+        format!(r#"{{"parentUuid":"u0",{env},"type":"user","message":{{"role":"user","content":"fix the failing spec in user_spec.rb"}},"uuid":"u1","timestamp":"2026-01-03T03:28:26.000Z"}}"#),
         format!(r#"{{"type":"custom-title","customTitle":"first-name","sessionId":"{id}"}}"#),
-        format!(r#"{{"parentUuid":"u1",{env},"message":{{"model":"claude-opus-5-5","id":"msg_1","type":"message","role":"assistant","content":[{{"type":"tool_use","id":"toolu_1","name":"Bash","input":{{"command":"bundle exec rspec","description":"Run spec"}}}}],"stop_reason":"tool_use","usage":{{"input_tokens":2,"output_tokens":181}}}},"type":"assistant","uuid":"a1","timestamp":"2026-10-27T03:28:30.000Z"}}"#),
-        format!(r#"{{"parentUuid":"a1",{env},"type":"user","message":{{"role":"user","content":[{{"tool_use_id":"toolu_1","type":"tool_result","content":"F.\nFailures:","is_error":false}}]}},"uuid":"u2","toolUseResult":{{"stdout":"F.","stderr":"","interrupted":false}},"timestamp":"2026-10-27T03:28:40.000Z"}}"#),
+        format!(r#"{{"parentUuid":"u1",{env},"message":{{"model":"claude-opus-5-5","id":"msg_1","type":"message","role":"assistant","content":[{{"type":"tool_use","id":"toolu_1","name":"Bash","input":{{"command":"bundle exec rspec","description":"Run spec"}}}}],"stop_reason":"tool_use","usage":{{"input_tokens":2,"output_tokens":181}}}},"type":"assistant","uuid":"a1","timestamp":"2026-01-03T03:28:30.000Z"}}"#),
+        format!(r#"{{"parentUuid":"a1",{env},"type":"user","message":{{"role":"user","content":[{{"tool_use_id":"toolu_1","type":"tool_result","content":"F.\nFailures:","is_error":false}}]}},"uuid":"u2","toolUseResult":{{"stdout":"F.","stderr":"","interrupted":false}},"timestamp":"2026-01-03T03:28:40.000Z"}}"#),
         format!(r#"{{"type":"agent-name","agentName":"renamed-later","sessionId":"{id}"}}"#),
-        format!(r#"{{"parentUuid":"u2",{env},"message":{{"role":"assistant","content":[{{"type":"text","text":"Fixed."}}]}},"type":"assistant","uuid":"a2","timestamp":"2026-10-27T03:30:00.000Z"}}"#),
+        format!(r#"{{"parentUuid":"u2",{env},"message":{{"role":"assistant","content":[{{"type":"text","text":"Fixed."}}]}},"type":"assistant","uuid":"a2","timestamp":"2026-01-03T03:30:00.000Z"}}"#),
         format!(r#"{{"type":"last-prompt","leafUuid":"a2","sessionId":"{id}"}}"#),
     ]
 }
@@ -40,15 +40,15 @@ pub fn codex_lines(id: &str, cwd: &str, source: &str) -> Vec<String> {
         format!("\"{source}\"")
     };
     vec![
-        format!(r#"{{"timestamp":"2026-05-07T16:58:02.928Z","type":"session_meta","payload":{{"id":"{id}","timestamp":"2026-05-07T16:57:30.619Z","cwd":"{cwd}","originator":"codex-tui","cli_version":"0.125.0","source":{source},"model_provider":"openai","git":{{"commit_hash":"736f","branch":"fix/gql-timeout","repository_url":"git@github.com:x/web.git"}},"base_instructions":"long"}}}}"#),
-        format!(r#"{{"timestamp":"2026-05-07T16:58:03.000Z","type":"turn_context","payload":{{"turn_id":"t1","cwd":"{cwd}","approval_policy":"on-request","sandbox_policy":{{"type":"workspace-write"}},"model":"gpt-5.4"}}}}"#),
-        r#"{"timestamp":"2026-05-07T16:58:03.100Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<permissions instructions>x"}]}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:03.200Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n<cwd>/w</cwd>\n</environment_context>"}]}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:04.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello codex"}]}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:04.001Z","type":"event_msg","payload":{"type":"user_message","message":"hello codex","images":[],"local_images":[],"text_elements":[]}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:05.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"ls\"}","call_id":"call_1"}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"a\nb"}}"#.to_string(),
-        r#"{"timestamp":"2026-05-07T16:58:07.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done."}],"phase":"final_answer"}}"#.to_string(),
+        format!(r#"{{"timestamp":"2026-01-02T16:58:02.928Z","type":"session_meta","payload":{{"id":"{id}","timestamp":"2026-01-02T16:57:30.619Z","cwd":"{cwd}","originator":"codex-tui","cli_version":"0.1.0","source":{source},"model_provider":"openai","git":{{"commit_hash":"0000","branch":"fix/timeout","repository_url":"git@github.com:example/app.git"}},"base_instructions":"long"}}}}"#),
+        format!(r#"{{"timestamp":"2026-01-02T16:58:03.000Z","type":"turn_context","payload":{{"turn_id":"t1","cwd":"{cwd}","approval_policy":"on-request","sandbox_policy":{{"type":"workspace-write"}},"model":"gpt-5.4"}}}}"#),
+        r#"{"timestamp":"2026-01-02T16:58:03.100Z","type":"response_item","payload":{"type":"message","role":"developer","content":[{"type":"input_text","text":"<permissions instructions>x"}]}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:03.200Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<environment_context>\n<cwd>/w</cwd>\n</environment_context>"}]}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:04.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"hello codex"}]}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:04.001Z","type":"event_msg","payload":{"type":"user_message","message":"hello codex","images":[],"local_images":[],"text_elements":[]}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:05.000Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","arguments":"{\"cmd\":\"ls\"}","call_id":"call_1"}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"a\nb"}}"#.to_string(),
+        r#"{"timestamp":"2026-01-02T16:58:07.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Done."}],"phase":"final_answer"}}"#.to_string(),
     ]
 }
 
@@ -69,7 +69,7 @@ pub fn write_claude(home: &Path, id: &str, cwd: &str, lines: &[String]) -> PathB
     )
 }
 
-/// `<home>/sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl` (`ts` like `2026-05-07T12-57-30`).
+/// `<home>/sessions/YYYY/MM/DD/rollout-<ts>-<id>.jsonl` (`ts` like `2026-01-02T12-57-30`).
 pub fn write_codex(home: &Path, id: &str, ts: &str, lines: &[String]) -> PathBuf {
     let (y, m, d) = (&ts[0..4], &ts[5..7], &ts[8..10]);
     write_raw(

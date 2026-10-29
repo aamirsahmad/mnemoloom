@@ -608,7 +608,7 @@ mod tests {
         let path = write_codex(
             dir.path(),
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/work", "cli"),
         );
         let transcript = Transcript::load(&path, Agent::Codex).unwrap();

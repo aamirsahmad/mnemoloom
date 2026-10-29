@@ -488,7 +488,7 @@ mod tests {
         let x = write_codex(
             d.path(),
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/old", "cli"),
         );
         let mut t = Transcript::load(&x, Agent::Codex).unwrap();
@@ -504,8 +504,8 @@ mod tests {
         let p = write_claude(d.path(), CLAUDE_ID, "/w", &claude_lines(CLAUDE_ID, "/w"));
         let i = delete_info(&p).unwrap();
         assert_eq!(i.total_lines, 10);
-        assert_eq!(i.first_ts.as_deref(), Some("2026-10-27T03:28:25.917Z"));
-        assert_eq!(i.last_ts.as_deref(), Some("2026-10-27T03:30:00.000Z"));
+        assert_eq!(i.first_ts.as_deref(), Some("2026-01-03T03:28:25.917Z"));
+        assert_eq!(i.last_ts.as_deref(), Some("2026-01-03T03:30:00.000Z"));
         assert_eq!(
             i.last_user.as_deref(),
             Some("fix the failing spec in user_spec.rb")
@@ -513,7 +513,7 @@ mod tests {
         let x = write_codex(
             d.path(),
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w", "cli"),
         );
         assert_eq!(

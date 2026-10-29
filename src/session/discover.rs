@@ -333,7 +333,7 @@ mod tests {
         let x = write_codex(
             &xh,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/p", "cli"),
         );
         fs::write(xh.join("session_index.jsonl"), format!("{{\"id\":\"{CODEX_ID}\",\"thread_name\":\"old\"}}\nbad\n{{\"id\":\"{}\",\"thread_name\":\"new name\"}}\n", CODEX_ID.to_uppercase())).unwrap();
@@ -400,7 +400,7 @@ mod tests {
         let x = write_codex(
             &elsewhere,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w", "cli"),
         );
         fs::create_dir_all(&xh).unwrap();
@@ -473,13 +473,13 @@ mod tests {
         write_codex(
             &xh,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/p", "exec"),
         );
         let x = write_codex(
             &xh,
             CODEX_ID2,
-            "2026-05-07T12-57-31",
+            "2026-01-02T12-57-31",
             &codex_lines(CODEX_ID2, "/w/p", "cli"),
         );
         let homes = Homes::new(&ch, &xh);

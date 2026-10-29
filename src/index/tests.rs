@@ -33,7 +33,7 @@ fn claude_with(id: &str, cwd: &str, prompt: &str, ts: &str) -> Vec<String> {
         .into_iter()
         .map(|l| {
             l.replace("fix the failing spec in user_spec.rb", prompt)
-                .replace("2026-10-27T03:30:00.000Z", ts)
+                .replace("2026-01-03T03:30:00.000Z", ts)
         })
         .collect()
 }
@@ -65,7 +65,7 @@ fn rows_round_trip_from_fast_fields() {
     write_codex(
         &e.homes.codex,
         CODEX_ID,
-        "2026-05-07T12-57-30",
+        "2026-01-02T12-57-30",
         &codex_lines(CODEX_ID, "/w/c", "cli"),
     );
     let cat = catalog(&e);
@@ -106,7 +106,7 @@ fn scope_type_agent_and_line_filters() {
     write_codex(
         &e.homes.codex,
         CODEX_ID,
-        "2026-05-07T12-57-30",
+        "2026-01-02T12-57-30",
         &codex_lines(CODEX_ID, "/w/a", "exec"),
     );
     let mut trimmed = claude_lines(ID3, "/w/a");

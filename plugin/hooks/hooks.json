@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "mnemoloom hook resume",
+            "command": "command -v mnemoloom >/dev/null 2>&1 || exit 0; exec mnemoloom hook resume",
             "timeout": 90
           }
         ]

@@ -396,9 +396,9 @@ mod tests {
             ("assistant", "Fixed.")
         );
         assert_eq!(d.custom_title, "renamed-later");
-        assert_eq!(d.created, "2026-10-27T03:28:25.917Z");
-        assert_eq!(d.modified, "2026-10-27T03:30:00.000Z");
-        assert_eq!(d.modified_ts, 1_793_071_800_000);
+        assert_eq!(d.created, "2026-01-03T03:28:25.917Z");
+        assert_eq!(d.modified, "2026-01-03T03:30:00.000Z");
+        assert_eq!(d.modified_ts, 1_767_411_000_000);
         assert!(d.content.contains("[user] fix the failing spec"));
         assert!(
             d.content
@@ -413,17 +413,17 @@ mod tests {
     fn codex_document() {
         let dir = tempfile::tempdir().unwrap();
         let lines = codex_lines(CODEX_ID, "/w/cx", "exec");
-        let p = write_codex(dir.path(), CODEX_ID, "2026-05-07T12-57-30", &lines);
+        let p = write_codex(dir.path(), CODEX_ID, "2026-01-02T12-57-30", &lines);
         let d = extract(&p, Agent::Codex).unwrap();
         assert_eq!(d.session_id, CODEX_ID);
-        assert_eq!(d.branch, "fix/gql-timeout");
+        assert_eq!(d.branch, "fix/timeout");
         assert!(d.is_exec_run);
         // The first user message (environment context) is never counted.
         assert_eq!(d.lines, 1);
         assert_eq!(d.first_user_msg_content, "hello codex");
         assert_eq!(d.first_msg.content, "hello codex");
         assert_eq!(d.last_msg.content, "Done.");
-        assert_eq!(d.created, "2026-05-07T16:58:02.928Z");
+        assert_eq!(d.created, "2026-01-02T16:58:02.928Z");
         assert!(
             d.content
                 .contains("[developer] <permissions instructions>x")

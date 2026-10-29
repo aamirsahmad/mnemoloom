@@ -478,7 +478,7 @@ fn codex_output_path_and_tools_list() {
     let home = dir.path().join("codex");
     let mut lines = codex_lines(CODEX_ID, "/w", "cli");
     lines[7] = serde_json::to_string(&codex_output("call_1", &"x".repeat(5000))).unwrap();
-    let src = write_codex(&home, CODEX_ID, "2026-05-07T12-57-30", &lines);
+    let src = write_codex(&home, CODEX_ID, "2026-01-02T12-57-30", &lines);
     let o = TrimOptions {
         target_tools: Some(parse_tools("exec_command,Bash")),
         ..TrimOptions::default()
@@ -825,7 +825,7 @@ fn archived_codex_trim_lands_in_codex_home() {
     let src = write_raw(
         &h.codex
             .join("archived_sessions")
-            .join(format!("rollout-2026-05-07T12-57-30-{CODEX_ID}.jsonl")),
+            .join(format!("rollout-2026-01-02T12-57-30-{CODEX_ID}.jsonl")),
         &lines,
     );
     let out = trim_and_create_session(None, &src, &TrimOptions::default(), None, &h).unwrap();
@@ -840,7 +840,7 @@ fn archived_codex_trim_lands_in_codex_home() {
     let small = write_raw(
         &dir.path()
             .join("x")
-            .join(format!("rollout-2026-05-07T12-57-30-{CODEX_ID2}.jsonl")),
+            .join(format!("rollout-2026-01-02T12-57-30-{CODEX_ID2}.jsonl")),
         &codex_lines(CODEX_ID2, "/w", "cli"),
     );
     let h2 = homes(&dir.path().join("other"));

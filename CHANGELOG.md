@@ -12,9 +12,9 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 - First release.
 - Support for Claude Code, Codex, pi and opencode sessions. pi and opencode support is read-only plus resume.
-- Full-text search over Claude Code and Codex sessions, with a terminal UI and JSON output.
+- Full-text search over Claude Code, Codex, pi and opencode sessions, with a terminal UI and JSON output.
 - Search UI with filter, results and preview panes, a project picker and match navigation.
-- Resume, clone, trim, trim in place, smart trim, roll over and port of sessions.
+- Resume, clone, trim, trim in place, smart trim and roll over of sessions, and conversion between Claude Code and Codex.
 - Session lineage: `lineage`, `find-original`, `find-derived`.
 - Session operations: `info`, `resolve`, `copy`, `move`, `move-account`, `delete`, `export`, `query`.
 - `mux`: list and jump to coding agents in tmux panes, with a live preview.

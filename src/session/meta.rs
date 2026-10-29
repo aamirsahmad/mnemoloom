@@ -808,10 +808,10 @@ mod tests {
             sf.first_user_message.as_deref(),
             Some("fix the failing spec in user_spec.rb")
         );
-        assert_eq!(sf.created.as_deref(), Some("2026-10-27T03:28:25.917Z"));
+        assert_eq!(sf.created.as_deref(), Some("2026-01-03T03:28:25.917Z"));
         assert_eq!(
             sf.last_timestamp.as_deref(),
-            Some("2026-10-27T03:30:00.000Z")
+            Some("2026-01-03T03:30:00.000Z")
         );
         assert_eq!(
             sf.line_count,
@@ -871,15 +871,15 @@ mod tests {
         let p = write_codex(
             d.path(),
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/web", "exec"),
         );
         let sf = SessionFile::read(&p, Agent::Codex, Depth::Full).unwrap();
         assert_eq!(sf.session_id, CODEX_ID);
         assert_eq!(sf.content_id.as_deref(), Some(CODEX_ID));
         assert_eq!(sf.cwd.as_deref(), Some("/w/web"));
-        assert_eq!(sf.git_branch.as_deref(), Some("fix/gql-timeout"));
-        assert_eq!(sf.created.as_deref(), Some("2026-05-07T16:58:02.928Z"));
+        assert_eq!(sf.git_branch.as_deref(), Some("fix/timeout"));
+        assert_eq!(sf.created.as_deref(), Some("2026-01-02T16:58:02.928Z"));
         assert_eq!(sf.first_user_message.as_deref(), Some("hello codex"));
         assert!(sf.is_valid && sf.is_exec_run && !sf.is_sidechain);
         assert_eq!(count_user_messages(&p, Agent::Codex), 2);
@@ -890,7 +890,7 @@ mod tests {
         );
 
         let sub = codex_lines(CODEX_ID, "/w", r#"{"subagent":{"thread_spawn":{}}}"#);
-        let p2 = write_codex(d.path(), CODEX_ID2, "2026-05-07T12-57-31", &sub);
+        let p2 = write_codex(d.path(), CODEX_ID2, "2026-01-02T12-57-31", &sub);
         assert!(
             SessionFile::read(&p2, Agent::Codex, Depth::Header)
                 .unwrap()
@@ -922,7 +922,7 @@ mod tests {
         let x = write_codex(
             d.path(),
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w", "cli"),
         );
         assert_eq!(detect_agent_from_content(&x), Some(Agent::Codex));

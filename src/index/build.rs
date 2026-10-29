@@ -378,7 +378,7 @@ mod tests {
         write_codex(
             &h.codex,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/c", "cli"),
         );
         let s = update(&idx, &h, None, LockWait::Block).unwrap();
@@ -523,7 +523,7 @@ mod tests {
         write_codex(
             &h.codex,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/c", "exec"),
         );
         let s = update(&idx, &h, None, LockWait::Block).unwrap();

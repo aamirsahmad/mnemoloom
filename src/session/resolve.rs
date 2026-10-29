@@ -1157,7 +1157,7 @@ mod tests {
         let codex_a = write_codex(
             &xh,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w/a", "cli"),
         );
         fs::write(
@@ -1263,7 +1263,7 @@ mod tests {
     #[test]
     fn tier4_filename_fragment() {
         let fx = fixture();
-        let r = resolve_in_home("2026-05-07T12-57", Agent::Codex, Some(&fx.homes.codex)).unwrap();
+        let r = resolve_in_home("2026-01-02T12-57", Agent::Codex, Some(&fx.homes.codex)).unwrap();
         let s = single(&r);
         assert_eq!(s.matched_by, Some(MatchKind::Filename));
         assert_eq!(s.name.as_deref(), Some("alpha codex"));
@@ -1517,7 +1517,7 @@ mod tests {
             &fx.homes
                 .codex
                 .join("archived_sessions")
-                .join(format!("rollout-2026-05-07T12-57-31-{CODEX_ID2}.jsonl")),
+                .join(format!("rollout-2026-01-02T12-57-31-{CODEX_ID2}.jsonl")),
             &codex_lines(CODEX_ID2, "/w/arch", "cli"),
         );
         let db = fx.homes.codex.join("state_5.sqlite");

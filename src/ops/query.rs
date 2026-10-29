@@ -343,7 +343,7 @@ mod tests {
         let helper = write_codex(
             &homes.codex,
             CODEX_ID2,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID2, "/w", "exec"),
         );
         let bins = fake(

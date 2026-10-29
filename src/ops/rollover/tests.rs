@@ -187,7 +187,7 @@ fn codex_rollover_end_to_end_with_fake_cli() {
     let src = write_codex(
         &homes.codex,
         CODEX_ID,
-        "2026-05-07T12-57-30",
+        "2026-01-02T12-57-30",
         &codex_lines(CODEX_ID, "/w", "cli"),
     );
     let tid = "019e0000-1111-7222-8333-444444444444";

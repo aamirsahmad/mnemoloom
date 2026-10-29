@@ -4,7 +4,7 @@ Find, resume, trim and hand off your coding-agent sessions.
 Supports Claude Code, Codex, pi and opencode.
 See all of your running agents in tmux on one screen.
 
-mnemoloom is one fast binary for macOS and Linux. It does not need Python or Node.
+mnemoloom is one fast binary for macOS and Linux. It has no runtime dependencies.
 
 ![CI](https://github.com/aamirsahmad/mnemoloom/actions/workflows/ci.yml/badge.svg)
 [![crates.io](https://img.shields.io/crates/v/mnemoloom.svg)](https://crates.io/crates/mnemoloom)
@@ -36,16 +36,25 @@ Install from crates.io:
 cargo install mnemoloom
 ```
 
-Or download a binary from [GitHub Releases](https://github.com/aamirsahmad/mnemoloom/releases).
-Put the binary in a directory on your `PATH`.
-
-Add the short command. It is a link to the same binary:
+Or install a binary from [GitHub Releases](https://github.com/aamirsahmad/mnemoloom/releases):
 
 ```bash
-ln -sf "$(command -v mnemoloom)" ~/.cargo/bin/mloom
+v=v0.1.0
+t=aarch64-apple-darwin   # or x86_64-apple-darwin, x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu
+curl -LO "https://github.com/aamirsahmad/mnemoloom/releases/download/$v/mnemoloom-$v-$t.tar.gz"
+tar -xzf "mnemoloom-$v-$t.tar.gz"
+install "mnemoloom-$v-$t/mnemoloom" ~/.local/bin/
 ```
 
-Do not name the link `nl`. That name is a standard Unix command.
+Make sure that `~/.local/bin` is on your `PATH`.
+To check the download, compare it with `SHA256SUMS` on the release page.
+If macOS blocks the binary, run `xattr -d com.apple.quarantine ~/.local/bin/mnemoloom`.
+
+Optional: add the short command `mloom`. It is a link to the same binary:
+
+```bash
+ln -s "$(command -v mnemoloom)" "$(dirname "$(command -v mnemoloom)")/mloom"
+```
 
 ## Agent support
 
@@ -63,11 +72,11 @@ mnemoloom reads pi and opencode data. It does not change pi or opencode session 
 ## Quick start
 
 ```bash
-mloom search                  # search all sessions for this directory
-mloom search -g "auth bug"    # search all directories
-mloom resume                  # resume the latest session for this directory
-mloom 15a6                    # open the action menu for a session ID fragment
-mloom mux                     # pick a running agent in tmux
+mnemoloom search                # search all sessions for this directory
+mnemoloom search -g "auth bug"  # search all directories
+mnemoloom resume                # resume the latest session for this directory
+mnemoloom 15a6                  # open the action menu for a session ID fragment
+mnemoloom mux                   # pick a running agent in tmux
 ```
 
 The first search builds the index. Later searches update only the changed files.
@@ -90,11 +99,11 @@ The first search builds the index. Later searches update only the changed files.
 | `build-index`, `index-stats`, `clear-index` | Manage the search index. |
 | `mux` | Show and jump to agents in tmux. See [mux](#mux). |
 
-Run `mloom <command> --help` for all options.
+Run `mnemoloom <command> --help` for all options.
 
 ## Search
 
-`mloom search` opens three panes: **Filters**, **Results** and **Preview**.
+`mnemoloom search` opens three panes: **Filters**, **Results** and **Preview**.
 
 | Key | Action |
 |---|---|
@@ -102,25 +111,27 @@ Run `mloom <command> --help` for all options.
 | `Tab`, `h`/`l` | Go to the next or previous pane. |
 | `j`/`k` | Move in the current pane. |
 | `Space` | In Filters: turn a filter on or off. |
-| `o`, `P` | Show only this project. Open the list of all projects. |
+| `o` | In Filters, on a project: show only this project. |
+| `P` | Open the list of all projects. |
 | `n`/`N` | In Preview: go to the next or previous match. |
 | `Enter` | Resume the session. |
 | `a` | Open the actions for the session. |
 | `y`, `x`, `t` | Copy the session ID. Export the session. Trim the session. |
 | `?` | Show all keys. |
-| `q`, `Esc` | Quit. |
+| `Esc` | Clear the query. Press again to quit. |
+| `q` | Quit. |
 
 For scripts and agents, use JSON output:
 
 ```bash
-mloom search --json -g -n 10 "rate limit"
+mnemoloom search --json -g -n 10 "rate limit"
 ```
 
 Each line is one session. The `lines` field is the number of user messages.
 
 ## mux
 
-`mloom mux` lists every Claude Code, Codex, pi and opencode agent in your tmux panes.
+`mnemoloom mux` lists every Claude Code, Codex, pi and opencode agent in your tmux panes.
 It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
 
 | Key | Action |
@@ -128,11 +139,11 @@ It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
 | Type | Filter the agents. |
 | `Enter` | Go to the agent pane. |
 | `Tab`, `/` | Go to the list. Go back to the filter. |
-| `p` | Show or hide the preview. |
-| `r` | Refresh. |
-| `?` | Show all keys. |
+| `p` | In the list: show or hide the preview. |
+| `r` | In the list: refresh. |
+| `?` | In the list: show all keys. |
 
-Use `mloom mux list` for a table, and `mloom mux list --json` for JSON.
+Use `mnemoloom mux list` for a table, and `mnemoloom mux list --json` for JSON.
 
 ## Claude Code plugin
 
@@ -150,7 +161,7 @@ Type these words as a prompt:
 
 | Prompt | Result |
 |---|---|
-| `>resume`, `>continue`, `>handoff` | Copy the session ID to the clipboard. Then run `mloom resume <ID>` in a new terminal. |
+| `>resume`, `>continue`, `>handoff` | Copy the session ID to the clipboard. Then run `mnemoloom resume <ID>` in a new terminal. |
 | `>session` | Copy the session ID to the clipboard. |
 | `>trim` | Show what a trim removes. Type `>trim yes` to apply it. |
 
@@ -168,8 +179,15 @@ Type these words as a prompt:
 | `MNEMOLOOM_CLAUDE_BIN`, `MNEMOLOOM_CODEX_BIN`, `MNEMOLOOM_PI_BIN`, `MNEMOLOOM_OPENCODE_BIN` | `claude`, `codex`, `pi`, `opencode` | Agent binaries to run. |
 | `MNEMOLOOM_TRIM_TIMEOUT` | `60` | Time limit in seconds for `>trim` in the hook. |
 
-mnemoloom does not change your session files, except when you run a command that writes (`trim-in-place`, `move`, `delete` and similar).
-Before it writes, it makes a backup or asks you to confirm.
+mnemoloom reads session files. Only these commands change them:
+
+- `trim-in-place` and `>trim yes`. They make a `.bak` backup first.
+- `move` and `move-account`.
+- `delete`. It asks you to confirm first.
+
+`trim`, `rollover`, `clone` and `port` write new session files. They do not change the original.
+`export` writes to `<project>/exported-sessions/` unless you give `-o`.
+mnemoloom never changes pi or opencode data.
 
 ## License
 

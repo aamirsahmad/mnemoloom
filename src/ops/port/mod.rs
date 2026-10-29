@@ -471,7 +471,7 @@ mod tests {
             Agent::Codex => write_codex(
                 &homes.codex,
                 CODEX_ID,
-                "2026-05-07T12-57-30",
+                "2026-01-02T12-57-30",
                 &values.iter().map(Value::to_string).collect::<Vec<_>>(),
             ),
             other => unreachable!("{other} is not portable"),
@@ -519,7 +519,7 @@ mod tests {
             lines[2]["payload"],
             json!({"type":"user_message","message":"fix the failing spec in user_spec.rb","images":[],"local_images":[],"audio":[],"local_audio":[],"text_elements":[]})
         );
-        for pair in lines[1..].chunks_exact(2) {
+        for pair in lines[1..].as_chunks::<2>().0 {
             assert_eq!(pair[0]["type"], "response_item");
             assert_eq!(pair[1]["type"], "event_msg");
             assert_eq!(pair[0]["timestamp"], pair[1]["timestamp"]);
@@ -544,7 +544,7 @@ mod tests {
         let source = write_codex(
             &homes.codex,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/work", "cli"),
         );
         let result = convert(&Transcript::load(&source, Agent::Codex).unwrap(), &homes).unwrap();

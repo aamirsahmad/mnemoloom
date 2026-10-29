@@ -170,14 +170,14 @@ mod tests {
         let src = write_codex(
             &homes.codex,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w", "cli"),
         );
         let new_id = "11111111-2222-4333-8444-555555555555";
         let dest = clone_session(Agent::Codex, &src, "/w", new_id, &homes).unwrap();
         assert_eq!(
             dest,
-            src.with_file_name(format!("rollout-2026-05-07T12-57-30-{new_id}.jsonl"))
+            src.with_file_name(format!("rollout-2026-01-02T12-57-30-{new_id}.jsonl"))
         );
         let t = Transcript::load(&dest, Agent::Codex).unwrap();
         assert_eq!(t.lines[0].value().unwrap()["payload"]["id"], new_id);

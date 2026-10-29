@@ -406,7 +406,7 @@ mod tests {
         let p = write_codex(
             &homes.codex,
             CODEX_ID,
-            "2026-05-07T16-57-30",
+            "2026-01-02T16-57-30",
             &codex_lines(CODEX_ID, "/w/proj", "cli"),
         );
         let sf = SessionFile::read(&p, Agent::Codex, Depth::Header).unwrap();

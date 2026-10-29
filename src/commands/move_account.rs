@@ -799,7 +799,7 @@ mod tests {
         let f = write_codex(
             &a,
             CODEX_ID,
-            "2026-05-07T12-57-30",
+            "2026-01-02T12-57-30",
             &codex_lines(CODEX_ID, "/w", "cli"),
         );
         fs::write(a.join("session_index.jsonl"), format!("{{\"id\":\"{CODEX_ID}\",\"thread_name\":\"t\"}}\n{{\"id\":\"other\",\"thread_name\":\"o\"}}\n")).unwrap();
@@ -824,7 +824,7 @@ mod tests {
             r.dest_file,
             fs::canonicalize(&b)
                 .unwrap()
-                .join("sessions/2026/05/07")
+                .join("sessions/2026/01/02")
                 .join(f.file_name().unwrap())
         );
     }

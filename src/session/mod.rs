@@ -235,7 +235,7 @@ mod tests {
         let id = "019c0dec-0001-7000-8000-0000000000c5";
         assert_eq!(session_uuid(&format!("{id}.jsonl")), id);
         assert_eq!(
-            session_uuid(&format!("rollout-2026-05-07T12-57-30-{id}.jsonl")),
+            session_uuid(&format!("rollout-2026-01-02T12-57-30-{id}.jsonl")),
             id
         );
         assert_eq!(session_uuid("short"), "short");
@@ -244,7 +244,7 @@ mod tests {
             "ses_0a1b2c3d4e5fParentAAAAAAAA"
         );
         assert_eq!(
-            codex_filename_id(&format!("rollout-2026-05-07T12-57-30-{id}.jsonl")).as_deref(),
+            codex_filename_id(&format!("rollout-2026-01-02T12-57-30-{id}.jsonl")).as_deref(),
             Some(id)
         );
         assert_eq!(codex_filename_id("rollout-x.jsonl"), None);
