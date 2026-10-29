@@ -1,0 +1,16 @@
+{
+  "description": "Session management hooks for mnemoloom resume/trim workflow",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mnemoloom hook resume",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}

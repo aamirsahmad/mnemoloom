@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mnemoloom",
+  "description": "Claude Code plugin for mnemoloom: search, resume and trim Claude Code and Codex sessions",
+  "owner": {
+    "name": "Aamir Ahmad",
+    "url": "https://github.com/aamirsahmad"
+  },
+  "plugins": [
+    {
+      "name": "mnemoloom",
+      "source": "./plugin",
+      "description": "Session-search agent, skills, resume/trim prompt hook and /recover-context command for the mnemoloom CLI",
+      "homepage": "https://github.com/aamirsahmad/mnemoloom",
+      "repository": "https://github.com/aamirsahmad/mnemoloom",
+      "license": "MIT OR Apache-2.0",
+      "category": "productivity"
+    }
+  ]
+}

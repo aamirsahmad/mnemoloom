@@ -1,0 +1,8 @@
+{
+  "name": "mnemoloom",
+  "version": "0.1.0",
+  "description": "Provides an agent, skill, hook, and slash command related to the `mnemoloom` tool-set for searching, resuming, and trimming CLI-agent sessions",
+  "author": {
+    "name": "Aamir Ahmad"
+  }
+}
