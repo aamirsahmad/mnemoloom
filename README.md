@@ -39,7 +39,7 @@ cargo install mnemoloom
 Or install a binary from [GitHub Releases](https://github.com/aamirsahmad/mnemoloom/releases):
 
 ```bash
-v=v0.3.0
+v=v0.4.0
 t=aarch64-apple-darwin   # or x86_64-apple-darwin, x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu
 curl -LO "https://github.com/aamirsahmad/mnemoloom/releases/download/$v/mnemoloom-$v-$t.tar.gz"
 tar -xzf "mnemoloom-$v-$t.tar.gz"

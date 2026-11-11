@@ -6,6 +6,14 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-11
+
+### Added
+
+- 25 built-in colour themes (Gruvbox Dark/Light, Nord, One Dark, Catppuccin Mocha/Macchiato/Frappe/Latte, Dracula, Tokyo Night/Storm/Day, Solarized Dark/Light, Everforest Dark/Light, Rose Pine/Moon/Dawn, Kanagawa, Monokai, GitHub Dark/Light, Ayu Dark, and Terminal/ANSI) plus custom `[themes.<name>]` palettes in `~/.config/mnemoloom/config.toml`.
+- `mnemoloom theme [NAME] [--path]` subcommand to list themes, save a theme to `config.toml`, or print the config path, along with `MNEMOLOOM_THEME` and `MNEMOLOOM_CONFIG` environment variables.
+- Live `Ctrl-O` theme picker modal in `search`, the interactive session menu, and `mux`, with instant preview and Enter to save to `config.toml`.
+
 ## [0.3.0] - 2026-11-10
 
 ### Added
@@ -38,7 +46,8 @@ This project uses [Semantic Versioning](https://semver.org/).
 - `mux`: list and jump to coding agents in tmux panes, with a live preview.
 - Claude Code plugin with the `>resume`, `>session` and `>trim` prompt hooks, a session-search agent and skills.
 
-[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aamirsahmad/mnemoloom/releases/tag/v0.1.0
