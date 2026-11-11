@@ -29,6 +29,11 @@ pub struct Homes {
     pub pi_overridden: bool,
     /// True when the opencode home came from `--opencode-home`.
     pub opencode_overridden: bool,
+    /// Antigravity CLI home (`--agy-home` > `$AGY_HOME` > `~/.gemini/antigravity-cli`).
+    /// Empty = not configured.
+    pub agy: PathBuf,
+    /// True when the agy home came from a flag or `AGY_HOME`.
+    pub agy_overridden: bool,
 }
 
 impl Homes {
@@ -37,21 +42,23 @@ impl Homes {
     /// A blank flag is an error (`"Claude home must not be empty."`).
     /// Existence is checked separately ([`validate_home_flags`], run by `main`).
     pub fn resolve(claude_arg: Option<&Path>, codex_arg: Option<&Path>) -> anyhow::Result<Homes> {
-        Homes::resolve_all(claude_arg, codex_arg, None, None)
+        Homes::resolve_all(claude_arg, codex_arg, None, None, None)
     }
 
-    /// [`Homes::resolve`] for all four agents (pi / opencode flags too).
+    /// [`Homes::resolve`] for all five agents (pi / opencode / agy flags too).
     pub fn resolve_all(
         claude_arg: Option<&Path>,
         codex_arg: Option<&Path>,
         pi_arg: Option<&Path>,
         opencode_arg: Option<&Path>,
+        agy_arg: Option<&Path>,
     ) -> anyhow::Result<Homes> {
         for (agent, arg) in [
             (Agent::Claude, claude_arg),
             (Agent::Codex, codex_arg),
             (Agent::Pi, pi_arg),
             (Agent::OpenCode, opencode_arg),
+            (Agent::Agy, agy_arg),
         ] {
             if arg.is_some_and(|a| a.as_os_str().to_string_lossy().trim().is_empty()) {
                 bail!("{} home must not be empty.", agent.label());
@@ -66,11 +73,14 @@ impl Homes {
             opencode: opencode_home(opencode_arg),
             pi_overridden: pi_arg.is_some() || env_nonempty("PI_CODING_AGENT_DIR").is_some(),
             opencode_overridden: opencode_arg.is_some(),
+            agy: agy_home(agy_arg),
+            agy_overridden: agy_arg.is_some() || env_nonempty("AGY_HOME").is_some(),
         })
     }
 
-    /// Explicit Claude / Codex homes (tests, move-account); pi and opencode
-    /// are left unconfigured (see [`Homes::with_pi`] / [`Homes::with_opencode`]).
+    /// Explicit Claude / Codex homes (tests, move-account); pi, opencode and
+    /// agy are left unconfigured (see [`Homes::with_pi`] /
+    /// [`Homes::with_opencode`] / [`Homes::with_agy`]).
     pub fn new(claude: impl Into<PathBuf>, codex: impl Into<PathBuf>) -> Homes {
         Homes {
             claude: claude.into(),
@@ -81,6 +91,8 @@ impl Homes {
             opencode: PathBuf::new(),
             pi_overridden: false,
             opencode_overridden: false,
+            agy: PathBuf::new(),
+            agy_overridden: false,
         }
     }
 
@@ -98,6 +110,13 @@ impl Homes {
         self
     }
 
+    /// Set an explicit agy home.
+    pub fn with_agy(mut self, agy: impl Into<PathBuf>) -> Homes {
+        self.agy = agy.into();
+        self.agy_overridden = true;
+        self
+    }
+
     /// Home directory for `agent` (empty when not configured).
     pub fn home(&self, agent: Agent) -> &Path {
         match agent {
@@ -105,6 +124,7 @@ impl Homes {
             Agent::Codex => &self.codex,
             Agent::Pi => &self.pi,
             Agent::OpenCode => &self.opencode,
+            Agent::Agy => &self.agy,
         }
     }
 
@@ -144,6 +164,7 @@ impl Homes {
             codex: norm(&self.codex),
             pi: norm(&self.pi),
             opencode: norm(&self.opencode),
+            agy: norm(&self.agy),
             ..self.clone()
         }
     }
@@ -242,6 +263,11 @@ pub fn opencode_home(arg: Option<&Path>) -> PathBuf {
     data.join("opencode")
 }
 
+/// agy home: `arg` > `$AGY_HOME` > `~/.gemini/antigravity-cli`, `~` expanded.
+pub fn agy_home(arg: Option<&Path>) -> PathBuf {
+    pick_home(arg, "AGY_HOME", ".gemini/antigravity-cli")
+}
+
 /// Home for `agent` with the same precedence.
 pub fn agent_home(agent: Agent, arg: Option<&Path>) -> PathBuf {
     match agent {
@@ -249,6 +275,7 @@ pub fn agent_home(agent: Agent, arg: Option<&Path>) -> PathBuf {
         Agent::Codex => codex_home(arg),
         Agent::Pi => pi_home(arg),
         Agent::OpenCode => opencode_home(arg),
+        Agent::Agy => agy_home(arg),
     }
 }
 
@@ -256,6 +283,24 @@ pub fn agent_home(agent: Agent, arg: Option<&Path>) -> PathBuf {
 /// Keep raw spellings (including symlinks); callers choose ordering,
 /// filtering and deduplication, and where to insert an env override.
 pub fn profile_homes(home: &Path, agent: Agent) -> Vec<PathBuf> {
+    if agent == Agent::Agy {
+        let gemini = home.join(".gemini");
+        let default = gemini.join("antigravity-cli");
+        let mut paths = vec![default];
+        if let Ok(entries) = std::fs::read_dir(&gemini) {
+            paths.extend(
+                entries
+                    .flatten()
+                    .filter(|e| {
+                        e.file_name()
+                            .to_string_lossy()
+                            .starts_with("antigravity-cli")
+                    })
+                    .map(|e| e.path()),
+            );
+        }
+        return paths;
+    }
     let prefix = format!(".{agent}");
     let mut paths = vec![home.join(&prefix)];
     if let Ok(entries) = std::fs::read_dir(home) {
@@ -384,23 +429,40 @@ mod tests {
     fn blank_flag_is_error() {
         let err = Homes::resolve(Some(Path::new(" ")), None).unwrap_err();
         assert_eq!(err.to_string(), "Claude home must not be empty.");
-        let err = Homes::resolve_all(None, None, None, Some(Path::new(""))).unwrap_err();
+        let err = Homes::resolve_all(None, None, None, Some(Path::new("")), None).unwrap_err();
         assert_eq!(err.to_string(), "opencode home must not be empty.");
     }
 
     #[test]
     fn pi_and_opencode_homes() {
         let d = tempfile::tempdir().unwrap();
-        let (pi, oc) = (d.path().join("pi"), d.path().join("oc"));
-        let h = Homes::resolve_all(None, None, Some(&pi), Some(&oc)).unwrap();
+        let (pi, oc, agy) = (
+            d.path().join("pi"),
+            d.path().join("oc"),
+            d.path().join("agy"),
+        );
+        let h = Homes::resolve_all(None, None, Some(&pi), Some(&oc), Some(&agy)).unwrap();
         assert_eq!((h.home(Agent::Pi), h.home(Agent::OpenCode)), (&*pi, &*oc));
-        assert!(h.pi_overridden && h.opencode_overridden);
+        assert_eq!(h.home(Agent::Agy), &*agy);
+        assert!(h.pi_overridden && h.opencode_overridden && h.agy_overridden);
         let n = Homes::new("/c", "/x");
-        assert!(!n.has(Agent::Pi) && !n.has(Agent::OpenCode) && n.has(Agent::Claude));
+        assert!(
+            !n.has(Agent::Pi)
+                && !n.has(Agent::OpenCode)
+                && !n.has(Agent::Agy)
+                && n.has(Agent::Claude)
+        );
         assert_eq!(n.canonical().pi, PathBuf::new());
-        let n = n.with_pi(&pi).with_opencode(&oc);
-        assert!(n.has(Agent::Pi) && n.pi_overridden && n.opencode_overridden);
+        let n = n.with_pi(&pi).with_opencode(&oc).with_agy(&agy);
+        assert!(
+            n.has(Agent::Pi)
+                && n.has(Agent::Agy)
+                && n.pi_overridden
+                && n.opencode_overridden
+                && n.agy_overridden
+        );
         assert!(opencode_home(None).ends_with("opencode"));
+        assert!(agy_home(None).ends_with("antigravity-cli"));
         assert!(pi_home(Some(Path::new("~/p"))).ends_with("p"));
     }
 }

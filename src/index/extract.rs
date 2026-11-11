@@ -62,7 +62,7 @@ pub struct SessionDoc {
 /// Extract the index document for `path` (an opencode virtual path for
 /// [`Agent::OpenCode`]).
 pub fn extract(path: &Path, agent: Agent) -> io::Result<SessionDoc> {
-    if matches!(agent, Agent::Pi | Agent::OpenCode) {
+    if matches!(agent, Agent::Pi | Agent::OpenCode | Agent::Agy) {
         return extract_messages(path, agent);
     }
     let sf = SessionFile::read(path, agent, Depth::Header)?;
@@ -495,6 +495,30 @@ mod tests {
         .unwrap();
         assert!(child.is_sidechain);
         assert_eq!(child.first_user_msg_content, "explore the code");
+    }
+
+    #[test]
+    fn agy_documents() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent_path = write_agy(dir.path(), "/w/agy");
+        let child_path = crate::session::agy::transcript_path(dir.path(), AGY_CHILD_ID);
+        let d = extract(&parent_path, Agent::Agy).unwrap();
+        assert_eq!((d.session_id.as_str(), d.agent), (AGY_ID, Agent::Agy));
+        assert_eq!(
+            (d.project.as_str(), d.custom_title.as_str()),
+            ("agy", "Agy rate limiter")
+        );
+        assert_eq!(d.lines, 1);
+        assert_eq!(d.first_user_msg_content, "add a rate limiter");
+        assert_eq!(d.last_msg.content, "Done.");
+        assert!(d.content.contains("[user] add a rate limiter"));
+        assert!(d.content.contains("[assistant] [Tool: run_command]"));
+        assert!(d.content.contains("[tool] src"));
+        assert!(d.content.contains("[assistant] Done."));
+        assert!(!d.is_sidechain);
+        let child = extract(&child_path, Agent::Agy).unwrap();
+        assert!(child.is_sidechain);
+        assert_eq!(child.first_user_msg_content, "subtask check");
     }
 
     #[test]

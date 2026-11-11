@@ -12,7 +12,7 @@ use crate::session::lineage::{
 };
 use crate::session::timefmt::iso_local_naive;
 use crate::session::{
-    Agent, Depth, ResolveOptions, SessionFile, opencode, path_session_uuid, pyjson, resolve,
+    Agent, Depth, ResolveOptions, SessionFile, agy, opencode, path_session_uuid, pyjson, resolve,
     session_stem,
 };
 
@@ -152,10 +152,10 @@ pub fn find_derived(global: &GlobalArgs, args: &FindDerivedArgs) -> anyhow::Resu
         Some(d) => vec![d.clone()],
         None => vec![homes.claude_projects(), homes.codex_sessions()],
     };
-    let index = if res.agent == Agent::OpenCode {
-        opencode::child_index(&homes.opencode)
-    } else {
-        child_index(&dirs)
+    let index = match res.agent {
+        Agent::OpenCode => opencode::child_index(&homes.opencode),
+        Agent::Agy => agy::child_index(&homes.agy),
+        _ => child_index(&dirs),
     };
     let tree = descendants(&root, &index);
     let mut all: Vec<PathBuf> = tree

@@ -45,6 +45,7 @@ fn required_subdir(agent: Agent) -> &'static str {
         Agent::Claude => "projects",
         Agent::Codex | Agent::Pi => "sessions",
         Agent::OpenCode => "opencode.db",
+        Agent::Agy => "brain",
     }
 }
 
@@ -56,6 +57,7 @@ pub fn candidate_source_homes(agent: Agent, to: &Path) -> Vec<PathBuf> {
         Agent::Codex => "CODEX_HOME",
         Agent::Pi => "PI_CODING_AGENT_DIR",
         Agent::OpenCode => "XDG_DATA_HOME",
+        Agent::Agy => "AGY_HOME",
     };
     let mut raw = profile_homes(&user_home(), agent);
     raw[1..].sort();
@@ -123,7 +125,7 @@ fn candidates_in(home: &Path, agent: Agent) -> Vec<Candidate> {
                 .collect()
         }
         // `run` refuses these agents before looking for candidates.
-        Agent::Pi | Agent::OpenCode => Vec::new(),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => Vec::new(),
     }
 }
 
@@ -349,7 +351,7 @@ pub fn run(_global: &GlobalArgs, args: &MoveAccountArgs) -> anyhow::Result<ExitC
             result.session_id
         ),
         Agent::Codex => println!("  {cd}CODEX_HOME={to_q} codex resume {}", result.session_id),
-        Agent::Pi | Agent::OpenCode => {}
+        Agent::Pi | Agent::OpenCode | Agent::Agy => {}
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -493,7 +495,7 @@ pub fn move_between(
                 );
             }
         }
-        Agent::Pi | Agent::OpenCode => agent.require_rewritable("move-account")?,
+        Agent::Pi | Agent::OpenCode | Agent::Agy => agent.require_rewritable("move-account")?,
     }
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).with_context(|| format!("creating {}", parent.display()))?;

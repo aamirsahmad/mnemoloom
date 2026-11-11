@@ -31,6 +31,7 @@ fn agent_arg(agent: Agent) -> AgentArg {
         Agent::Codex => AgentArg::Codex,
         Agent::Pi => AgentArg::Pi,
         Agent::OpenCode => AgentArg::OpenCode,
+        Agent::Agy => AgentArg::Agy,
     }
 }
 
@@ -64,7 +65,7 @@ fn print_shell_resume(global: &GlobalArgs, s: &SessionView) -> anyhow::Result<Ex
             println!("{env}claude -r {}", s.session_id);
         }
         Agent::Codex => println!("codex resume {}", s.session_id),
-        agent @ (Agent::Pi | Agent::OpenCode) => {
+        agent @ (Agent::Pi | Agent::OpenCode | Agent::Agy) => {
             let homes = global.homes()?;
             let target = crate::session::resume_target(agent, &s.path);
             let argv = resume_argv(agent, &target, ClaudeFlag::Short);

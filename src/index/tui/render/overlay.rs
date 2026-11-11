@@ -160,6 +160,7 @@ fn filter_modal(frame: &mut Frame, app: &App, sel: usize, area: Rect) {
                 FilterItem::CodexOnly => dot(f.agents.single() == Some(Agent::Codex)),
                 FilterItem::PiOnly => dot(f.agents.single() == Some(Agent::Pi)),
                 FilterItem::OpenCodeOnly => dot(f.agents.single() == Some(Agent::OpenCode)),
+                FilterItem::AgyOnly => dot(f.agents.single() == Some(Agent::Agy)),
                 FilterItem::MinLines => f.min_lines.map_or(" [Any]".into(), |n| format!(" [≥{n}]")),
                 FilterItem::After => f
                     .after

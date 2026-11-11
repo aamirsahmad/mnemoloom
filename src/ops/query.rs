@@ -68,7 +68,7 @@ fn export_and_ask(
 fn query_agent(session: Agent) -> Agent {
     match session {
         Agent::Codex => Agent::Codex,
-        Agent::Claude | Agent::Pi | Agent::OpenCode => Agent::Claude,
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => Agent::Claude,
     }
 }
 
@@ -91,7 +91,7 @@ fn export_session(res: &Resolution) -> anyhow::Result<(ScratchDir, PathBuf)> {
 fn prompt(agent: Agent, export_path: &Path, query: &str) -> String {
     let p = export_path.display();
     match agent {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => format!(
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => format!(
             "There is a log of a past conversation with an AI agent in this file: {p}\n\n\
              Strategically use PARALLEL SUB-AGENTS to explore {p} (which may be very long) to answer the following question:\n\n\
              {query}\n\n\
@@ -112,7 +112,7 @@ fn prompt(agent: Agent, export_path: &Path, query: &str) -> String {
 fn query_args(agent: Agent, prompt: String) -> Vec<String> {
     let v = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
     match agent {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => {
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => {
             let mut args = v(&["-p", "--no-session-persistence"]);
             args.push(prompt);
             args.extend(v(&[
@@ -139,7 +139,7 @@ fn query_args(agent: Agent, prompt: String) -> Vec<String> {
 fn parse_answer(agent: Agent, stdout: &str) -> (Option<String>, Option<String>) {
     let text = |v: Option<&Value>| v.and_then(Value::as_str).map(str::to_string);
     match agent {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => last_json_object(stdout)
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => last_json_object(stdout)
             .map_or((None, None), |v| {
                 (text(v.get("result")), text(v.get("session_id")))
             }),

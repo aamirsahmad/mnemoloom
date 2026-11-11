@@ -127,7 +127,7 @@ pub(super) fn flatten(transcript: &Transcript, meta: &Metadata) -> Vec<FlatMessa
         Agent::Claude => flatten_claude(transcript, meta.timestamp.as_deref()),
         Agent::Codex => flatten_codex(transcript, meta.timestamp.as_deref()),
         // Refused by `port` (`Agent::require_rewritable`).
-        Agent::Pi | Agent::OpenCode => Vec::new(),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => Vec::new(),
     }
 }
 

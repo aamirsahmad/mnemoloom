@@ -123,6 +123,9 @@ pub fn full_chain(path: &Path) -> Vec<(PathBuf, Derivation)> {
     if super::opencode::split_virtual(path).is_some() {
         return super::opencode::parent_chain(path);
     }
+    if super::agy::session_id_from_path(path).is_some() {
+        return super::agy::parent_chain(path);
+    }
     let mut chain = Vec::new();
     let mut visited = HashSet::new();
     let mut current = path.to_path_buf();
@@ -286,7 +289,7 @@ pub fn inject_into_first_user_message(
                         && v.pointer("/payload/role").and_then(Value::as_str) == Some("user"))
             }
             // Never rewritten (see `Agent::require_rewritable`).
-            Agent::Pi | Agent::OpenCode => return None,
+            Agent::Pi | Agent::OpenCode | Agent::Agy => return None,
         };
         if !target {
             continue;
@@ -354,7 +357,7 @@ fn prepend_note(agent: Agent, v: &mut Value, note: &str) -> bool {
                 None => false,
             }
         }
-        Agent::Pi | Agent::OpenCode => false,
+        Agent::Pi | Agent::OpenCode | Agent::Agy => false,
     }
 }
 

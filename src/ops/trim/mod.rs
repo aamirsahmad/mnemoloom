@@ -169,7 +169,7 @@ pub fn trim_lines(
         Agent::Claude => claude::process(lines, opts, parent_file, new_session_id),
         Agent::Codex => codex::process(lines, opts, parent_file, new_session_id),
         // Refused by `Agent::require_rewritable` before any trim.
-        Agent::Pi | Agent::OpenCode => TrimStats::default(),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => TrimStats::default(),
     }
 }
 
@@ -350,7 +350,7 @@ pub(crate) fn session_cwd(path: &Path, agent: Agent) -> Option<String> {
                 .then(|| v.pointer("/payload/cwd"))
                 .flatten()
                 .map(|c| c.as_str().unwrap_or("").to_string()),
-            Agent::Pi | Agent::OpenCode => None,
+            Agent::Pi | Agent::OpenCode | Agent::Agy => None,
         })
 }
 
@@ -427,7 +427,7 @@ fn new_session_path(
                 now.format("%Y-%m-%dT%H-%M-%S")
             ))
         }
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     }
 }
 

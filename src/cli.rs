@@ -13,13 +13,13 @@ use clap::{Args, CommandFactory, Parser, Subcommand, ValueEnum};
 
 use crate::session::{Agent, Homes};
 
-/// Session tools for Claude Code, Codex, pi and opencode.
+/// Session tools for Claude Code, Codex, pi, opencode and agy.
 #[derive(Parser, Debug)]
 #[command(
     name = "mnemoloom",
     version,
-    about = "Session management tools for Claude Code, Codex, pi and opencode.",
-    after_help = "Environment variables:\n  CLAUDE_CONFIG_DIR    Default Claude home (overridden by --claude-home)\n  CODEX_HOME           Default Codex home (overridden by --codex-home)\n  PI_CODING_AGENT_DIR  Default pi home (overridden by --pi-home)\n  XDG_DATA_HOME        opencode data dir parent (overridden by --opencode-home)"
+    about = "Session management tools for Claude Code, Codex, pi, opencode and agy.",
+    after_help = "Environment variables:\n  CLAUDE_CONFIG_DIR    Default Claude home (overridden by --claude-home)\n  CODEX_HOME           Default Codex home (overridden by --codex-home)\n  PI_CODING_AGENT_DIR  Default pi home (overridden by --pi-home)\n  XDG_DATA_HOME        opencode data dir parent (overridden by --opencode-home)\n  AGY_HOME             Default agy home (overridden by --agy-home)"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -45,6 +45,9 @@ pub struct GlobalArgs {
     /// opencode data directory (default: $XDG_DATA_HOME/opencode or ~/.local/share/opencode)
     #[arg(long, global = true, value_name = "DIR")]
     pub opencode_home: Option<PathBuf>,
+    /// Antigravity CLI home directory (default: ~/.gemini/antigravity-cli or AGY_HOME)
+    #[arg(long, global = true, value_name = "DIR")]
+    pub agy_home: Option<PathBuf>,
 }
 
 impl GlobalArgs {
@@ -55,21 +58,23 @@ impl GlobalArgs {
             self.codex_home.as_deref(),
             self.pi_home.as_deref(),
             self.opencode_home.as_deref(),
+            self.agy_home.as_deref(),
         )
     }
 
     /// `(flag, value)` for each home flag ([`crate::session::homes::validate_home_flags`]).
-    pub fn home_flags(&self) -> [(&'static str, Option<&std::path::Path>); 4] {
+    pub fn home_flags(&self) -> [(&'static str, Option<&std::path::Path>); 5] {
         [
             ("--claude-home", self.claude_home.as_deref()),
             ("--codex-home", self.codex_home.as_deref()),
             ("--pi-home", self.pi_home.as_deref()),
             ("--opencode-home", self.opencode_home.as_deref()),
+            ("--agy-home", self.agy_home.as_deref()),
         ]
     }
 }
 
-/// `--agent claude|codex|pi|opencode`.
+/// `--agent claude|codex|pi|opencode|agy`.
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentArg {
     Claude,
@@ -77,6 +82,8 @@ pub enum AgentArg {
     Pi,
     #[value(name = "opencode")]
     OpenCode,
+    #[value(name = "agy")]
+    Agy,
 }
 
 impl From<AgentArg> for Agent {
@@ -86,6 +93,7 @@ impl From<AgentArg> for Agent {
             AgentArg::Codex => Agent::Codex,
             AgentArg::Pi => Agent::Pi,
             AgentArg::OpenCode => Agent::OpenCode,
+            AgentArg::Agy => Agent::Agy,
         }
     }
 }
@@ -95,7 +103,7 @@ pub fn agent_of(a: Option<AgentArg>) -> Option<Agent> {
     a.map(Agent::from)
 }
 
-/// `search --agent claude|codex|pi|opencode|all`.
+/// `search --agent claude|codex|pi|opencode|agy|all`.
 #[derive(ValueEnum, Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SearchAgent {
     Claude,
@@ -103,6 +111,8 @@ pub enum SearchAgent {
     Pi,
     #[value(name = "opencode")]
     OpenCode,
+    #[value(name = "agy")]
+    Agy,
     #[default]
     All,
 }
@@ -300,10 +310,10 @@ pub struct SearchArgs {
 pub struct ResolveArgs {
     /// Session name, full ID, ID fragment, or filename fragment
     pub query: String,
-    /// claude|codex|pi|opencode (single agent only)
+    /// claude|codex|pi|opencode|agy (single agent only)
     #[arg(
         long,
-        value_name = "claude|codex|pi|opencode",
+        value_name = "claude|codex|pi|opencode|agy",
         default_value = "claude"
     )]
     pub agent: String,
@@ -630,11 +640,12 @@ pub fn command() -> clap::Command {
 /// Index of the first positional, skipping the values of the home flags
 /// (`--claude-home`, ...). `args[0]` is the program name.
 fn first_positional(args: &[OsString]) -> Option<usize> {
-    const HOME_FLAGS: [&str; 4] = [
+    const HOME_FLAGS: [&str; 5] = [
         "--claude-home",
         "--codex-home",
         "--pi-home",
         "--opencode-home",
+        "--agy-home",
     ];
     let mut i = 1;
     while i < args.len() {

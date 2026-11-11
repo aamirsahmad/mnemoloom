@@ -53,7 +53,7 @@ impl AgentBins {
     /// Claude.
     pub fn get(&self, agent: Agent) -> &OsStr {
         match agent {
-            Agent::Claude | Agent::Pi | Agent::OpenCode => &self.claude,
+            Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => &self.claude,
             Agent::Codex => &self.codex,
         }
     }
@@ -277,7 +277,7 @@ pub fn find_session_file(agent: Agent, id: &str, homes: &Homes) -> Option<PathBu
                 .is_some_and(|n| n.to_string_lossy().contains(id))
         }),
         // Never used as headless helpers.
-        Agent::Pi | Agent::OpenCode => None,
+        Agent::Pi | Agent::OpenCode | Agent::Agy => None,
     }
 }
 

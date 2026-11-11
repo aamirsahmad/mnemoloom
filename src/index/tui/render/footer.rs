@@ -139,7 +139,9 @@ fn hints(app: &App) -> (Hints, Hints) {
 /// Input-mode prompt (`Min lines: 15▏`).
 fn prompt(kind: InputKind, buf: &str) -> String {
     let label = match kind {
-        InputKind::Agent => return "agent: 1 claude  2 codex  3 pi  4 opencode  0 all".into(),
+        InputKind::Agent => {
+            return "agent: 1 claude  2 codex  3 pi  4 opencode  5 agy  0 all".into();
+        }
         InputKind::MinLines => "min lines",
         InputKind::JumpToRow => "go to row",
         InputKind::AfterDate => "after date",

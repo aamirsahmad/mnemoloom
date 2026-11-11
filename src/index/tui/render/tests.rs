@@ -341,7 +341,7 @@ fn project_picker_overlay() {
     a.projects.hidden.insert("proj01".into());
     a.mode = Mode::Normal;
     a.focus = Focus::Filters;
-    a.facet_cursor = 4 + facets::TOP_PROJECTS;
+    a.facet_cursor = 5 + facets::TOP_PROJECTS;
     let b = render(&mut a, &f, 140, 36);
     let (mx, my) = find(&b, "…32 more  ⏎ all").expect("more row");
     assert_eq!(b[(mx, my)].fg, theme::DIM);
@@ -448,8 +448,8 @@ fn pi_and_opencode_badges_facets_and_preview() {
     let (ox, oy) = find(&b, "OPC").expect("opencode badge");
     assert_eq!(b[(ox, oy)].fg, theme::OPENCODE);
     assert!(oy > py, "cards in result order");
-    // All four agents in the filter pane, with counts.
-    for (i, name) in ["claude", "codex", "pi", "opencode"]
+    // All five agents in the filter pane, with counts.
+    for (i, name) in ["claude", "codex", "pi", "opencode", "agy"]
         .into_iter()
         .enumerate()
     {
@@ -460,6 +460,7 @@ fn pi_and_opencode_badges_facets_and_preview() {
     assert_eq!(b[(25, 5)].symbol(), "0", "codex");
     assert_eq!(b[(25, 6)].symbol(), "1", "pi");
     assert_eq!(b[(25, 7)].symbol(), "1", "opencode");
+    assert_eq!(b[(25, 8)].symbol(), "0", "agy");
     // The preview header names the agent; the gutter labels pi's replies.
     assert!(has(&b, "pi · 00000000"));
     let (gx, gy) = find(&b, "    pi dex's default").expect("pi gutter");

@@ -11,6 +11,7 @@ pub enum Kind {
     Codex,
     Pi,
     OpenCode,
+    Agy,
 }
 
 impl Kind {
@@ -20,6 +21,7 @@ impl Kind {
             Kind::Codex => "codex",
             Kind::Pi => "pi",
             Kind::OpenCode => "opencode",
+            Kind::Agy => "agy",
         }
     }
 }

@@ -335,6 +335,7 @@ fn badge(kind: Kind) -> Span<'static> {
         Kind::Codex => ("CDX", theme::CODEX),
         Kind::Pi => ("PI ", theme::PI),
         Kind::OpenCode => ("OPC", theme::OPENCODE),
+        Kind::Agy => ("AGY", theme::AGY),
     };
     Span::styled(label, Style::new().fg(colour).bold())
 }
@@ -691,7 +692,14 @@ mod tests {
         assert!(screen.contains("● idle   OPC opencode task"));
         assert_eq!(badge(Kind::Pi).style.fg, Some(theme::PI));
         assert_eq!(badge(Kind::OpenCode).style.fg, Some(theme::OPENCODE));
-        for kind in [Kind::Claude, Kind::Codex, Kind::Pi, Kind::OpenCode] {
+        assert_eq!(badge(Kind::Agy).style.fg, Some(theme::AGY));
+        for kind in [
+            Kind::Claude,
+            Kind::Codex,
+            Kind::Pi,
+            Kind::OpenCode,
+            Kind::Agy,
+        ] {
             assert_eq!(badge(kind).content.chars().count(), 3);
         }
         assert!(screen.contains("p:1.1 · pi · opus"));

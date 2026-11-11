@@ -80,7 +80,7 @@ pub fn clone_session(
             dir.join(format!("{new_id}.jsonl"))
         }
         Agent::Codex => codex_clone_path(source, new_id)?,
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     copy2(source, &dest).with_context(|| format!("copying to {}", dest.display()))?;
     let mut t = Transcript::load(&dest, agent)?;
@@ -116,7 +116,7 @@ pub(crate) fn rewrite_session_ids(t: &mut Transcript, new_id: &str) -> bool {
             Agent::Codex => (m.get("type").and_then(Value::as_str) == Some("session_meta")
                 && m.get("payload").is_some_and(|p| p.get("id").is_some()))
             .then_some("/payload/id"),
-            Agent::Pi | Agent::OpenCode => None,
+            Agent::Pi | Agent::OpenCode | Agent::Agy => None,
         };
         let Some(ptr) = target else { continue };
         if let Some(v) = line.value_mut().and_then(|v| v.pointer_mut(ptr)) {

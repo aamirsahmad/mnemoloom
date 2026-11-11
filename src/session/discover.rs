@@ -12,7 +12,7 @@ use serde_json::Value;
 
 use super::encode::project_dir_candidates;
 use super::meta::{Depth, SessionFile};
-use super::{Agent, Homes, opencode, pi};
+use super::{Agent, Homes, agy, opencode, pi};
 
 /// Timeout for `git rev-parse` (a slow fsmonitor or network mount).
 const GIT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -210,8 +210,16 @@ pub fn discover(homes: &Homes, opts: DiscoverOptions) -> Vec<SessionFile> {
                 .map(|p| (Agent::Pi, p)),
         );
     }
+    if wants(Agent::Agy) {
+        paths.extend(
+            agy::session_paths(&homes.agy)
+                .into_iter()
+                .map(|p| (Agent::Agy, p)),
+        );
+    }
     let mut out: Vec<SessionFile> = scan_paths(paths, opts.depth)
         .into_iter()
+        .filter(|sf| sf.agent != Agent::Agy || opts.include_subagents || !sf.is_sidechain)
         .map(|sf| sf.with_codex_name(&names))
         .collect();
     if wants(Agent::OpenCode) {
@@ -282,6 +290,7 @@ pub fn latest_for_cwd(
             Agent::Codex => scan_paths(tagged(codex_session_paths(&homes.codex)), Depth::Header),
             Agent::Pi => scan_paths(tagged(pi::session_paths(&homes.pi)), Depth::Header),
             Agent::OpenCode => opencode_sessions(&homes.opencode, Depth::Header),
+            Agent::Agy => scan_paths(tagged(agy::session_paths(&homes.agy)), Depth::Header),
         };
         let mut found: Vec<SessionFile> = scanned
             .into_iter()

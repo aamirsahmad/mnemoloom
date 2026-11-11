@@ -72,6 +72,7 @@ fn agent_arg(a: Agent) -> Option<cli::AgentArg> {
         Agent::Codex => cli::AgentArg::Codex,
         Agent::Pi => cli::AgentArg::Pi,
         Agent::OpenCode => cli::AgentArg::OpenCode,
+        Agent::Agy => cli::AgentArg::Agy,
     })
 }
 
@@ -218,7 +219,7 @@ mod tests {
             for agent in [Agent::Claude, Agent::Codex] {
                 assert_eq!(refusal(a, &row(agent)), None, "{a:?} {agent:?}");
             }
-            for agent in [Agent::Pi, Agent::OpenCode] {
+            for agent in [Agent::Pi, Agent::OpenCode, Agent::Agy] {
                 assert_eq!(refusal(a, &row(agent)).is_some(), rewrites(a), "{a:?}");
             }
         }

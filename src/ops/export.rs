@@ -197,7 +197,7 @@ fn render(transcript: &Transcript, verbose: bool) -> (String, Stats) {
         match transcript.agent {
             Agent::Claude => render_claude(value, index, &messages, &mut output, &mut stats),
             Agent::Codex => render_codex(value, index, &messages, &mut output, &mut stats),
-            Agent::Pi | Agent::OpenCode => {}
+            Agent::Pi | Agent::OpenCode | Agent::Agy => {}
         }
     }
     (output, stats)
@@ -745,6 +745,7 @@ mod tests {
             codex_home: Some(dir.path().join("codex")),
             pi_home: Some(dir.path().join("pi")),
             opencode_home: Some(dir.path().join("opencode")),
+            agy_home: Some(dir.path().join("agy")),
         };
         export(
             &global,
@@ -766,16 +767,22 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let cwd = dir.path().join("project");
         let cwd = cwd.to_str().unwrap();
-        let (pi, oc) = (dir.path().join("pi"), dir.path().join("opencode"));
+        let (pi, oc, agy) = (
+            dir.path().join("pi"),
+            dir.path().join("opencode"),
+            dir.path().join("agy"),
+        );
         write_pi(&pi, PI_ID, cwd, &pi_lines(PI_ID, cwd));
         write_opencode_db(&oc.join("opencode.db"), cwd, 1_000);
+        write_agy(&agy, cwd);
         let global = GlobalArgs {
             claude_home: Some(dir.path().join("claude")),
             codex_home: Some(dir.path().join("codex")),
             pi_home: Some(pi),
             opencode_home: Some(oc),
+            agy_home: Some(agy),
         };
-        for (id, agent) in [(PI_ID, "pi"), (OPENCODE_ID, "opencode")] {
+        for (id, agent) in [(PI_ID, "pi"), (OPENCODE_ID, "opencode"), (AGY_ID, "agy")] {
             let out = dir.path().join(format!("{agent}.txt"));
             export(
                 &global,
@@ -788,7 +795,10 @@ mod tests {
             .unwrap();
             let text = std::fs::read_to_string(&out).unwrap();
             assert!(text.starts_with("> add a rate limiter"), "{agent}: {text}");
-            assert!(text.contains("bash"), "{agent}: {text}");
+            assert!(
+                text.contains("bash") || text.contains("run_command"),
+                "{agent}: {text}"
+            );
             assert!(
                 !text.contains("Called the Read tool"),
                 "synthetic part: {text}"
@@ -814,6 +824,7 @@ mod tests {
             codex_home: Some(dir.path().join("codex")),
             pi_home: Some(dir.path().join("pi")),
             opencode_home: Some(dir.path().join("opencode")),
+            agy_home: Some(dir.path().join("agy")),
         };
         let err = export(
             &global,

@@ -1,4 +1,4 @@
-//! Find every tmux pane running a coding agent (Claude, Codex, pi, opencode).
+//! Find every tmux pane running a coding agent (Claude, Codex, pi, opencode, agy).
 //!
 //! One `tmux list-panes` and one `ps` for the whole server; `capture-pane`
 //! only for panes hosting an agent, overlapped with the `lsof` probe.
@@ -33,14 +33,14 @@ pub fn scan(now: f64) -> Vec<Agent> {
         return Vec::new();
     }
     let panes: Vec<&str> = candidates.iter().map(|c| c.record.pane.as_str()).collect();
-    let codex: Vec<u32> = candidates
+    let fds: Vec<u32> = candidates
         .iter()
-        .filter(|c| c.kind == Kind::Codex)
+        .filter(|c| matches!(c.kind, Kind::Codex | Kind::Agy))
         .map(|c| c.pid)
         .collect();
     let (screens, open) = rayon::join(
         || tmux::capture_all(&panes),
-        || activity::probe_rollouts(&snapshot, &codex),
+        || activity::probe_rollouts(&snapshot, &fds),
     );
     let mut agents = assemble_all(candidates, screens);
     activity::enrich(&mut agents, &snapshot, &open, now);

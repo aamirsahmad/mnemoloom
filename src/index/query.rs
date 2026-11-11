@@ -302,6 +302,7 @@ pub struct Filters {
     /// Empty when the agent's home is not configured.
     pub pi_home: String,
     pub opencode_home: String,
+    pub agy_home: String,
 }
 
 impl Filters {
@@ -327,6 +328,7 @@ impl Filters {
             codex_home: home_key(homes, Agent::Codex),
             pi_home: home_key(homes, Agent::Pi),
             opencode_home: home_key(homes, Agent::OpenCode),
+            agy_home: home_key(homes, Agent::Agy),
         }
     }
 
@@ -368,6 +370,7 @@ impl Filters {
             Agent::Codex => &self.codex_home,
             Agent::Pi => &self.pi_home,
             Agent::OpenCode => &self.opencode_home,
+            Agent::Agy => &self.agy_home,
         }
     }
 

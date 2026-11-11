@@ -222,7 +222,7 @@ pub(crate) fn build_prompt(req: &Request) -> String {
             req.config.claude_subagent_model.to_uppercase()
         ),
         Agent::Codex => "parallel sub-agents (if available)".to_string(),
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     rollover_prompt(&req.chain, req.kind, req.custom_prompt, Some(&subagents))
 }
@@ -255,7 +255,7 @@ pub(crate) fn run(req: &Request, homes: &Homes, bins: &AgentBins) -> anyhow::Res
             let model = (!quick).then_some(req.config.codex_rollover_model.as_str());
             create_codex(&prompt, model, homes, bins)?
         }
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     println!("✅ Session created and analysis complete: {new_id}\n");
     let parent_id = match req.target {
@@ -266,7 +266,7 @@ pub(crate) fn run(req: &Request, homes: &Homes, bins: &AgentBins) -> anyhow::Res
             .to_string_lossy()
             .into_owned(),
         Agent::Codex => path_session_uuid(req.source),
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     // Look the new session file up rather than computing its path from the
     // cwd, so a project-dir mismatch cannot lose the lineage link.
@@ -384,20 +384,22 @@ fn launch_args(
     let mut args = match agent {
         Agent::Claude => vec!["--resume".to_string(), id.to_string()],
         Agent::Codex => vec!["resume".to_string(), id.to_string()],
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     println!(
         "Step 3: 🚀 Launching interactive {} session...",
         match agent {
             Agent::Claude => "Claude Code",
             Agent::Codex => "Codex",
-            Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+            Agent::Pi | Agent::OpenCode | Agent::Agy => {
+                unreachable!("refused by require_rewritable")
+            }
         }
     );
     println!("   Session ID: {id}");
     let model = &config.codex_default_model;
     match agent {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => {}
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => {}
         Agent::Codex if model.is_empty() => println!("   (Using codex default model)"),
         Agent::Codex => {
             println!("   Model: {model}");

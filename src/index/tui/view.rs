@@ -459,7 +459,7 @@ impl Preview {
     pub fn load(row: Row, keywords: Vec<String>) -> anyhow::Result<Preview> {
         let path = Path::new(&row.file_path);
         let lines = load_text(path, row.agent)?;
-        let parent = if row.agent == Agent::OpenCode {
+        let parent = if matches!(row.agent, Agent::OpenCode | Agent::Agy) {
             let chain = if row.is_sidechain {
                 full_chain(path)
             } else {

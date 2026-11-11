@@ -196,6 +196,7 @@ pub struct Counts {
     pub codex: usize,
     pub pi: usize,
     pub opencode: usize,
+    pub agy: usize,
     /// Count desc, then name asc.
     pub projects: Vec<(String, usize)>,
 }
@@ -207,6 +208,7 @@ impl Counts {
             Agent::Codex => self.codex,
             Agent::Pi => self.pi,
             Agent::OpenCode => self.opencode,
+            Agent::Agy => self.agy,
         }
     }
 
@@ -216,6 +218,7 @@ impl Counts {
             Agent::Codex => &mut self.codex,
             Agent::Pi => &mut self.pi,
             Agent::OpenCode => &mut self.opencode,
+            Agent::Agy => &mut self.agy,
         }
     }
 }
@@ -423,23 +426,27 @@ pub(crate) mod tests {
             row(2, Agent::Pi, "web"),
             row(3, Agent::OpenCode, "api"),
             row(4, Agent::Codex, "web"),
+            row(5, Agent::Agy, "web"),
         ];
-        let base = [0, 1, 2, 3, 4];
+        let base = [0, 1, 2, 3, 4, 5];
         let mut f = filters();
         let sel = ProjectSel::default();
         let c = count(&rows, &base, &f, &sel);
         let per_agent = Agent::ALL.map(|a| c.agent(a));
-        assert_eq!(per_agent, [1, 1, 2, 1]);
-        assert_eq!((c.pi, c.opencode), (2, 1));
+        assert_eq!(per_agent, [1, 1, 2, 1, 1]);
+        assert_eq!((c.pi, c.opencode, c.agy), (2, 1, 1));
         // pi only: project counts follow pi, agent counts stay.
         f.agents = Agents::only(Agent::Pi);
         let c = count(&rows, &base, &f, &sel);
-        assert_eq!(Agent::ALL.map(|a| c.agent(a)), [1, 1, 2, 1]);
+        assert_eq!(Agent::ALL.map(|a| c.agent(a)), [1, 1, 2, 1, 1]);
         assert_eq!(c.projects, [("api".into(), 1), ("web".into(), 1)]);
         let today = day("2026-10-29");
         let checks = Agent::ALL.map(|a| state(&f, &sel, &Facet::Agent(a), today));
-        assert_eq!(checks, [Check::Off, Check::Off, Check::On, Check::Off]);
-        assert_eq!(&items(&c, &sel)[..4], Agent::ALL.map(Facet::Agent));
+        assert_eq!(
+            checks,
+            [Check::Off, Check::Off, Check::On, Check::Off, Check::Off]
+        );
+        assert_eq!(&items(&c, &sel)[..5], Agent::ALL.map(Facet::Agent));
     }
 
     #[test]
@@ -455,8 +462,8 @@ pub(crate) mod tests {
         assert_eq!(shown.last().unwrap(), &("p11".to_string(), 9));
         assert_eq!(more, 3);
         let it = items(&c, &sel);
-        assert_eq!(it.len(), 4 + TOP_PROJECTS + 1 + 1 + 6 + 3);
-        assert_eq!(it[4 + TOP_PROJECTS + 1], Facet::MoreProjects);
+        assert_eq!(it.len(), 5 + TOP_PROJECTS + 1 + 1 + 6 + 3);
+        assert_eq!(it[5 + TOP_PROJECTS + 1], Facet::MoreProjects);
         // `only` projects come first, then the rest of the top ones.
         sel.only_this("p10");
         sel.toggle("p03");
@@ -566,6 +573,7 @@ pub(crate) mod tests {
         t(&mut f, Facet::Agent(Agent::Claude));
         t(&mut f, Facet::Agent(Agent::Pi));
         t(&mut f, Facet::Agent(Agent::OpenCode));
+        t(&mut f, Facet::Agent(Agent::Agy));
         assert_eq!(f.agents, Agents::only(Agent::Codex));
         t(&mut f, Facet::Agent(Agent::Codex));
         assert_eq!(f.agents, Agents::only(Agent::Codex), "last agent stays on");
@@ -576,6 +584,7 @@ pub(crate) mod tests {
         t(&mut f, Facet::Agent(Agent::Claude));
         t(&mut f, Facet::Agent(Agent::Codex));
         t(&mut f, Facet::Agent(Agent::Pi));
+        t(&mut f, Facet::Agent(Agent::Agy));
         assert!(f.agents.is_all());
 
         t(&mut f, Facet::When(When::Week));

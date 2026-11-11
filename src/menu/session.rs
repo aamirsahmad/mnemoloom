@@ -247,7 +247,7 @@ fn title(view: &SessionView, homes: &Homes) -> Option<String> {
     let sf = SessionFile::read(&view.path, view.agent, Depth::Full).ok()?;
     let sf = match view.agent {
         Agent::Codex => sf.with_codex_name(&codex_thread_names(&homes.codex)),
-        Agent::Claude | Agent::Pi | Agent::OpenCode => sf,
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => sf,
     };
     sf.name.filter(|n| !n.is_empty())
 }

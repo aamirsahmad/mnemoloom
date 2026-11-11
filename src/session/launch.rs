@@ -30,6 +30,7 @@ pub fn agent_bin(agent: Agent) -> OsString {
         Agent::Codex => "MNEMOLOOM_CODEX_BIN",
         Agent::Pi => "MNEMOLOOM_PI_BIN",
         Agent::OpenCode => "MNEMOLOOM_OPENCODE_BIN",
+        Agent::Agy => "MNEMOLOOM_AGY_BIN",
     };
     std::env::var_os(var)
         .filter(|v| !v.is_empty())
@@ -37,8 +38,9 @@ pub fn agent_bin(agent: Agent) -> OsString {
 }
 
 /// The resume argv: `[<claude>, "-r"|"--resume", id]` / `[<codex>, "resume", id]`
-/// / `[<pi>, "--session", file]` / `[<opencode>, "-s", id]`. `session_id` is
-/// the agent's resume target ([`super::resume_target`]: the file for pi).
+/// / `[<pi>, "--session", file]` / `[<opencode>, "-s", id]` /
+/// `[<agy>, "--conversation", id]`. `session_id` is the agent's resume target
+/// ([`super::resume_target`]: the file for pi).
 pub fn resume_argv(agent: Agent, session_id: &str, flag: ClaudeFlag) -> Vec<OsString> {
     resume_argv_with(agent_bin(agent), agent, session_id, flag)
 }
@@ -56,14 +58,15 @@ fn resume_argv_with(
         (Agent::Codex, _) => "resume",
         (Agent::Pi, _) => "--session",
         (Agent::OpenCode, _) => "-s",
+        (Agent::Agy, _) => "--conversation",
     };
     vec![bin, sub.into(), session_id.into()]
 }
 
 /// The home variable the agent must see: `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
-/// / `PI_CODING_AGENT_DIR` when that agent's home was overridden (flag or
-/// env), so it looks in the same home the session was resolved from. An
-/// overridden opencode home `<dir>/opencode` exports `XDG_DATA_HOME=<dir>`
+/// / `PI_CODING_AGENT_DIR` / `AGY_HOME` when that agent's home was overridden
+/// (flag or env), so it looks in the same home the session was resolved from.
+/// An overridden opencode home `<dir>/opencode` exports `XDG_DATA_HOME=<dir>`
 /// (opencode has no data-dir variable of its own).
 fn resume_env(agent: Agent, homes: &Homes) -> Option<(&'static str, &Path)> {
     match agent {
@@ -76,6 +79,7 @@ fn resume_env(agent: Agent, homes: &Homes) -> Option<(&'static str, &Path)> {
         {
             homes.opencode.parent().map(|p| ("XDG_DATA_HOME", p))
         }
+        Agent::Agy if homes.agy_overridden => Some(("AGY_HOME", &homes.agy)),
         _ => None,
     }
 }

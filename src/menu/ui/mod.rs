@@ -85,13 +85,14 @@ fn bold(style: Style) -> Style {
     style.add_modifier(Modifier::BOLD)
 }
 
-/// `CLD` / `CDX` / `PI ` / `OPC` in the agent colour.
+/// `CLD` / `CDX` / `PI ` / `OPC` / `AGY` in the agent colour.
 fn agent_badge(agent: Agent) -> Span<'static> {
     let color = match agent {
         Agent::Claude => theme::CLAUDE,
         Agent::Codex => theme::CODEX,
         Agent::Pi => theme::PI,
         Agent::OpenCode => theme::OPENCODE,
+        Agent::Agy => theme::AGY,
     };
     Span::styled(agent.badge(), bold(Style::new().fg(color)))
 }

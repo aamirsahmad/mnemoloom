@@ -273,6 +273,7 @@ pub fn parse_line(agent: Agent, line_index: usize, v: &Value) -> Vec<Message> {
         Agent::Codex => parse_codex(line_index, v),
         Agent::Pi => super::pi::parse_entry(line_index, v),
         Agent::OpenCode => super::opencode::parse_message(line_index, v),
+        Agent::Agy => super::agy::parse_step(line_index, v),
     }
 }
 

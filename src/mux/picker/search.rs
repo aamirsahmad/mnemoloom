@@ -88,7 +88,7 @@ pub fn hits(
 
 /// The default index and homes, as `mnemoloom search` uses them.
 pub fn default_index() -> Option<(PathBuf, Homes)> {
-    let homes = Homes::resolve_all(None, None, None, None).ok()?;
+    let homes = Homes::resolve_all(None, None, None, None, None).ok()?;
     Some((store::default_index_dir(), homes.canonical()))
 }
 

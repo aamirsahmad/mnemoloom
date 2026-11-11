@@ -24,6 +24,7 @@ impl Fixture {
             codex_home: Some(temp.path().join("codex")),
             pi_home: Some(temp.path().join("pi")),
             opencode_home: Some(temp.path().join("opencode")),
+            agy_home: Some(temp.path().join("agy")),
         };
         let homes = global.homes().unwrap();
         let cwd = temp.path().join("project with spaces");

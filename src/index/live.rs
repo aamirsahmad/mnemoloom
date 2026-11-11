@@ -52,6 +52,8 @@ pub fn parse_ps_line(line: &str) -> Option<Proc> {
         Agent::Claude
     } else if comm == "codex" || comm.contains("/codex/codex") || comm.ends_with("/codex") {
         Agent::Codex
+    } else if comm == "agy" || comm.ends_with("/agy") {
+        Agent::Agy
     } else {
         return None;
     };

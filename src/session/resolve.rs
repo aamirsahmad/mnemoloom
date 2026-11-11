@@ -23,7 +23,7 @@ use super::discover::{claude_session_paths, codex_session_paths, codex_thread_na
 use super::homes::{agent_home, expand_tilde};
 use super::meta::{Depth, SessionFile, detect_agent};
 use super::timefmt::iso_local_offset;
-use super::{Agent, Homes, absolute, codex_filename_id, opencode, path_session_uuid, pi};
+use super::{Agent, Homes, absolute, agy, codex_filename_id, opencode, path_session_uuid, pi};
 use crate::exit::Exit;
 
 /// Ambiguity listings / pickers show at most this many candidates.
@@ -87,7 +87,7 @@ impl SessionRecord {
             name: match sf.agent {
                 Agent::Claude if eligible => sf.name.clone(),
                 Agent::Claude => None,
-                Agent::Codex | Agent::Pi | Agent::OpenCode => sf.name.clone(),
+                Agent::Codex | Agent::Pi | Agent::OpenCode | Agent::Agy => sf.name.clone(),
             },
             directory: sf.cwd.clone(),
             home: home.to_path_buf(),
@@ -286,6 +286,7 @@ fn candidate_paths(agent: Agent, home: &Path) -> Result<Vec<PathBuf>, ResolverEr
         Agent::Claude => ("projects", "Claude projects path"),
         Agent::Codex => ("sessions", "Codex sessions path"),
         Agent::Pi | Agent::OpenCode => ("sessions", "pi sessions path"),
+        Agent::Agy => ("brain", "agy brain path"),
     };
     let root = home.join(sub);
     if !root.exists() {
@@ -301,6 +302,7 @@ fn candidate_paths(agent: Agent, home: &Path) -> Result<Vec<PathBuf>, ResolverEr
         Agent::Claude => claude_session_paths(home, false),
         Agent::Codex => codex_session_paths(home),
         Agent::Pi | Agent::OpenCode => pi::session_paths(home),
+        Agent::Agy => agy::session_paths(home),
     })
 }
 
@@ -467,6 +469,37 @@ fn opencode_records(
         .collect())
 }
 
+/// agy records from `<home>/brain/*/.system_generated/logs/transcript.jsonl`
+/// enriched with `conversation_summaries.db` / `annotations` / `history.jsonl`.
+fn agy_records(
+    home: &Path,
+    only_id: Option<&str>,
+    db_fallback: bool,
+) -> Result<Vec<SessionRecord>, ResolverError> {
+    let paths: Vec<(Agent, PathBuf)> = candidate_paths(Agent::Agy, home)?
+        .into_iter()
+        .filter(|p| only_id.is_none_or(|q| path_session_uuid(p).to_lowercase() == q))
+        .map(|p| (Agent::Agy, p))
+        .collect();
+    if let Err(e) = agy::summaries(home)
+        && !db_fallback
+    {
+        return Err(ResolverError::new(
+            "unreadable_database",
+            format!(
+                "Cannot read {}: {e}",
+                home.join("conversation_summaries.db").display()
+            ),
+        ));
+    }
+    let records = scan_paths(paths, Depth::Header)
+        .into_iter()
+        .filter(|sf| sf.is_valid)
+        .map(|sf| SessionRecord::from_session(&sf, home))
+        .collect();
+    Ok(dedup(records))
+}
+
 fn records(
     agent: Agent,
     home: &Path,
@@ -478,6 +511,7 @@ fn records(
         Agent::Codex => codex_records(home, only_id, db_fallback),
         Agent::Pi => pi_records(home, only_id),
         Agent::OpenCode => opencode_records(home, only_id, db_fallback),
+        Agent::Agy => agy_records(home, only_id, db_fallback),
     }
 }
 
@@ -1060,6 +1094,7 @@ pub fn files_with_id(agent: Agent, session_id: &str, homes: &Homes) -> Vec<PathB
         Agent::Claude => claude_session_paths(home, false),
         Agent::Codex => codex_session_paths(home),
         Agent::Pi => pi::session_paths(home),
+        Agent::Agy => agy::session_paths(home),
         Agent::OpenCode => {
             return opencode::all_sessions(home)
                 .0

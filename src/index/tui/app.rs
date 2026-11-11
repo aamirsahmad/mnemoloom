@@ -99,13 +99,14 @@ pub enum FilterItem {
     CodexOnly,
     PiOnly,
     OpenCodeOnly,
+    AgyOnly,
     MinLines,
     After,
     Before,
 }
 
 impl FilterItem {
-    pub const ALL: [FilterItem; 15] = [
+    pub const ALL: [FilterItem; 16] = [
         FilterItem::Reset,
         FilterItem::Original,
         FilterItem::Sub,
@@ -118,6 +119,7 @@ impl FilterItem {
         FilterItem::CodexOnly,
         FilterItem::PiOnly,
         FilterItem::OpenCodeOnly,
+        FilterItem::AgyOnly,
         FilterItem::MinLines,
         FilterItem::After,
         FilterItem::Before,
@@ -137,6 +139,7 @@ impl FilterItem {
             FilterItem::CodexOnly => "(e) Codex only",
             FilterItem::PiOnly => "(i) pi only",
             FilterItem::OpenCodeOnly => "(n) opencode only",
+            FilterItem::AgyOnly => "(g) agy only",
             FilterItem::MinLines => "(l) Minimum lines",
             FilterItem::After => "(>) After date",
             FilterItem::Before => "(<) Before date",
@@ -694,7 +697,7 @@ impl App {
         if kind == InputKind::Agent {
             let agents = match k.code {
                 KeyCode::Char('0') => Agents::ALL,
-                KeyCode::Char(c @ '1'..='4') => {
+                KeyCode::Char(c @ '1'..='5') => {
                     Agents::only(Agent::ALL[usize::from(c as u8 - b'1')])
                 }
                 KeyCode::Esc => return Effect::None,
@@ -845,6 +848,7 @@ impl App {
             FilterItem::CodexOnly => f.agents = Agents::only(Agent::Codex),
             FilterItem::PiOnly => f.agents = Agents::only(Agent::Pi),
             FilterItem::OpenCodeOnly => f.agents = Agents::only(Agent::OpenCode),
+            FilterItem::AgyOnly => f.agents = Agents::only(Agent::Agy),
             FilterItem::MinLines => return self.open_input(InputKind::MinLines),
             FilterItem::After => return self.open_input(InputKind::AfterDate),
             FilterItem::Before => return self.open_input(InputKind::BeforeDate),
@@ -1040,7 +1044,7 @@ mod tests {
             assert_eq!(a.on_key(ch('2')), Effect::Refilter);
             assert_eq!(a.filters.agents, Agents::only(Agent::Codex));
         }
-        for (k, agent) in ['1', '2', '3', '4'].into_iter().zip(Agent::ALL) {
+        for (k, agent) in ['1', '2', '3', '4', '5'].into_iter().zip(Agent::ALL) {
             let mut a = app();
             a.on_key(ch(':'));
             a.on_key(ch('a'));
@@ -1141,6 +1145,8 @@ mod tests {
         assert_eq!(a.filters.agents, Agents::only(Agent::Pi));
         a.on_key(ch('n'));
         assert_eq!(a.filters.agents, Agents::only(Agent::OpenCode));
+        a.on_key(ch('g'));
+        assert_eq!(a.filters.agents, Agents::only(Agent::Agy));
         a.filters.after = parse_date_now("2026-01-01");
         a.on_key(ch('x'));
         assert!(!a.filters.include_exec && !a.filters.live_only && a.filters.agents.is_all());
@@ -1299,17 +1305,18 @@ mod tests {
             codex: 2,
             pi: 1,
             opencode: 0,
+            agy: 0,
             projects: vec![("webapp".into(), 4), ("infra".into(), 1)],
         };
         a.on_key(ch('h'));
         assert_eq!(a.focus, Focus::Filters);
-        // Items: claude, codex, pi, opencode, webapp, infra, today, yesterday,
+        // Items: claude, codex, pi, opencode, agy, webapp, infra, today, yesterday,
         // 3d, 7d, 30d, all, originals, derived, sidechains.
-        assert_eq!(a.facet_items().len(), 15);
+        assert_eq!(a.facet_items().len(), 16);
         assert_eq!(a.on_key(ch(' ')), Effect::Refilter);
         assert!(!a.filters.agents.contains(Agent::Claude));
         assert!(a.filters.agents.contains(Agent::Codex) && a.filters.agents.contains(Agent::Pi));
-        for _ in 0..4 {
+        for _ in 0..5 {
             a.on_key(ch('j'));
         }
         assert_eq!(a.on_key(key(KeyCode::Enter)), Effect::Refilter);
@@ -1323,9 +1330,9 @@ mod tests {
             facets::When::Week.bound(Local::now().date_naive())
         );
         a.on_key(ch('G'));
-        assert_eq!(a.facet_cursor, 14);
+        assert_eq!(a.facet_cursor, 15);
         a.on_key(ch('j'));
-        assert_eq!(a.facet_cursor, 14, "cursor clamps");
+        assert_eq!(a.facet_cursor, 15, "cursor clamps");
         a.on_key(ch(' '));
         assert!(a.filters.include_sub);
         a.on_key(ch('g'));
@@ -1342,6 +1349,7 @@ mod tests {
             codex: 2,
             pi: 1,
             opencode: 0,
+            agy: 0,
             projects: (0..n).map(|i| (format!("p{i}"), 1)).collect(),
         };
         a.set_counts(counts(5));
@@ -1422,6 +1430,7 @@ mod tests {
             codex: 2,
             pi: 1,
             opencode: 0,
+            agy: 0,
             projects: (0..12).map(|i| (format!("p{i:02}"), 20 - i)).collect(),
         };
         a
@@ -1438,7 +1447,7 @@ mod tests {
     fn more_projects_row_opens_the_picker() {
         let mut a = many_projects();
         a.on_key(ch('h'));
-        let more = 4 + facets::TOP_PROJECTS;
+        let more = 5 + facets::TOP_PROJECTS;
         assert_eq!(a.facet_items()[more], Facet::MoreProjects);
         for _ in 0..more {
             a.on_key(ch('j'));
@@ -1510,13 +1519,13 @@ mod tests {
         let mut a = many_projects();
         a.on_key(ch('h'));
         assert_eq!(a.on_key(ch('o')), Effect::None, "not on a project row");
-        for _ in 0..7 {
+        for _ in 0..8 {
             a.on_key(ch('j'));
         }
-        assert_eq!(a.facet_items()[7], Facet::Project("p03".into()));
+        assert_eq!(a.facet_items()[8], Facet::Project("p03".into()));
         assert_eq!(a.on_key(ch('o')), Effect::Refilter);
         assert_eq!(a.projects.only, ["p03".to_string()].into());
-        assert_eq!(a.facet_cursor, 4, "cursor follows it to the top");
+        assert_eq!(a.facet_cursor, 5, "cursor follows it to the top");
         assert!(a.filters_set());
         a.on_key(ch('j'));
         a.on_key(ch(' '));

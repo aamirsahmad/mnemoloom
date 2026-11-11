@@ -110,7 +110,7 @@ fn convert(transcript: &Transcript, homes: &Homes) -> anyhow::Result<Ported> {
     match transcript.agent {
         Agent::Claude => write_codex(transcript, homes, &meta, &source_id, &messages),
         Agent::Codex => write_claude(transcript, homes, &meta, &source_id, &messages),
-        Agent::Pi | Agent::OpenCode => transcript
+        Agent::Pi | Agent::OpenCode | Agent::Agy => transcript
             .agent
             .require_rewritable("port")
             .map(|()| unreachable!("refused by require_rewritable")),
@@ -862,6 +862,7 @@ mod tests {
         let global = GlobalArgs {
             pi_home: Some(homes.claude.with_file_name("pi")),
             opencode_home: Some(homes.claude.with_file_name("opencode")),
+            agy_home: Some(homes.claude.with_file_name("agy")),
             claude_home: Some(homes.claude),
             codex_home: Some(homes.codex),
         };

@@ -87,6 +87,7 @@ impl SessionFile {
         match agent {
             Agent::Pi => return super::pi::read_meta(path, depth),
             Agent::OpenCode => return super::opencode::read_meta(path, depth),
+            Agent::Agy => return super::agy::read_meta(path, depth),
             Agent::Claude | Agent::Codex => {}
         }
         let md = fs::metadata(path)?;
@@ -176,6 +177,7 @@ impl SessionFile {
             Agent::Codex => self.is_valid,
             Agent::Pi => self.is_valid && self.cwd.is_some(),
             Agent::OpenCode => self.is_valid && !self.is_sidechain,
+            Agent::Agy => self.is_valid && !self.is_sidechain,
         }
     }
 
@@ -277,8 +279,8 @@ impl Scanner {
         match self.agent {
             Agent::Claude => self.visit_claude(line, sf),
             Agent::Codex => self.visit_codex(line, sf),
-            // Read by `pi::read_meta` / `opencode::read_meta` instead.
-            Agent::Pi | Agent::OpenCode => false,
+            // Read by `pi::read_meta` / `opencode::read_meta` / `agy::read_meta` instead.
+            Agent::Pi | Agent::OpenCode | Agent::Agy => false,
         }
     }
 
@@ -684,6 +686,13 @@ pub fn detect_agent_from_content(path: &Path) -> Option<Agent> {
         if ty == Some("session") && o.contains_key("id") && o.contains_key("cwd") {
             return Some(Agent::Pi);
         }
+        if o.get("step_index").and_then(Value::as_u64).is_some()
+            && o.get("created_at").and_then(Value::as_str).is_some()
+            && (matches!(ty, Some("USER_INPUT" | "PLANNER_RESPONSE" | "GENERIC"))
+                || o.get("source").and_then(Value::as_str).is_some())
+        {
+            return Some(Agent::Agy);
+        }
         if o.contains_key("id")
             && o.contains_key("timestamp")
             && (o.contains_key("git") || o.contains_key("instructions"))
@@ -723,6 +732,8 @@ pub fn detect_agent(path: &Path, homes: &super::Homes) -> Option<Agent> {
         Some(Agent::Codex)
     } else if under(Agent::Pi) {
         Some(Agent::Pi)
+    } else if under(Agent::Agy) || super::agy::session_id_from_path(&resolved).is_some() {
+        Some(Agent::Agy)
     } else if s.contains("/.claude/") {
         Some(Agent::Claude)
     } else if s.contains("/.codex/") {
@@ -746,6 +757,7 @@ pub fn count_user_messages(path: &Path, agent: Agent) -> usize {
     match agent {
         Agent::Pi => return super::pi::count_user_messages(path),
         Agent::OpenCode => return super::opencode::count_user_messages(path),
+        Agent::Agy => return super::agy::count_user_messages(path),
         Agent::Claude | Agent::Codex => {}
     }
     let Ok(f) = File::open(path) else { return 0 };
@@ -776,7 +788,7 @@ fn is_counted_user(v: &Value, agent: Agent) -> bool {
                 && v.pointer("/payload/type").and_then(Value::as_str) == Some("message")
                 && v.pointer("/payload/role").and_then(Value::as_str) == Some("user")
         }
-        Agent::Pi | Agent::OpenCode => false,
+        Agent::Pi | Agent::OpenCode | Agent::Agy => false,
     }
 }
 

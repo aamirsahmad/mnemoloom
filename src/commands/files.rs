@@ -183,7 +183,7 @@ pub fn rewrite_cwd(t: &mut Transcript, new_cwd: &str) -> (Option<String>, Option
                     Value::String(new_cwd.to_string());
             }
             // Never moved (see `Agent::require_rewritable`).
-            Agent::Pi | Agent::OpenCode => {}
+            Agent::Pi | Agent::OpenCode | Agent::Agy => {}
         }
     }
     (old, sid)
@@ -276,7 +276,7 @@ pub fn move_session(global: &GlobalArgs, args: &MoveArgs) -> anyhow::Result<Exit
             println!("\nSession updated successfully!");
             path_session_uuid(&src)
         }
-        Agent::Pi | Agent::OpenCode => unreachable!("refused by require_rewritable"),
+        Agent::Pi | Agent::OpenCode | Agent::Agy => unreachable!("refused by require_rewritable"),
     };
     println!("  From: {}", old_cwd.as_deref().unwrap_or("None"));
     println!("  To:   {new_cwd}");

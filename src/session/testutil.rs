@@ -97,6 +97,8 @@ pub fn set_mtime(path: &Path, secs: u64) {
 pub const PI_ID: &str = "019f0e1d-0001-7000-8000-0000000000a1";
 pub const OPENCODE_ID: &str = "ses_0a1b2c3d4e5fParentAAAAAAAA";
 pub const OPENCODE_CHILD_ID: &str = "ses_0a1b2c3d4e5fChildBBBBBBBB";
+pub const AGY_ID: &str = "a6100000-0001-4000-8000-000000000001";
+pub const AGY_CHILD_ID: &str = "a6100000-0002-4000-8000-000000000002";
 
 /// A pi session with a branch: after `a1b` the user first asked `u2`
 /// ("try redis", abandoned), then edited it into `u3`; the active branch
@@ -268,4 +270,54 @@ pub fn write_opencode_db(db: &Path, directory: &str, updated: i64) -> PathBuf {
         .unwrap();
     }
     db.to_path_buf()
+}
+
+/// Synthetic `agy` transcript lines (`USER_INPUT`, `PLANNER_RESPONSE`, `GENERIC`).
+pub fn agy_lines(prompt: &str) -> Vec<String> {
+    vec![
+        format!(
+            r#"{{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-11-10T04:00:00Z","content":"<USER_REQUEST>\n{prompt}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: 2026-11-10T04:00:00Z.\n</ADDITIONAL_METADATA>"}}"#
+        ),
+        r#"{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-10T04:00:01Z","thinking":"plan","tool_calls":[{"name":"run_command","args":{"CommandLine":"\"ls -la\"","WaitMsBeforeAsync":"5000","toolSummary":"\"List files\""}}]}"#.to_string(),
+        r#"{"step_index":2,"source":"MODEL","type":"GENERIC","status":"DONE","created_at":"2026-11-10T04:00:03Z","content":"src\n"}"#.to_string(),
+        r#"{"step_index":3,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-11-10T04:00:05Z","content":"Done."}"#.to_string(),
+    ]
+}
+
+/// Populate an `agy` home with [`AGY_ID`] and child [`AGY_CHILD_ID`], returning
+/// the parent transcript path.
+pub fn write_agy(home: &Path, directory: &str) -> PathBuf {
+    let parent_path = super::agy::transcript_path(home, AGY_ID);
+    let child_path = super::agy::transcript_path(home, AGY_CHILD_ID);
+    write_raw(&parent_path, &agy_lines("add a rate limiter"));
+    write_raw(&child_path, &agy_lines("subtask check"));
+
+    let db = home.join("conversation_summaries.db");
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute_batch(
+        "CREATE TABLE conversation_summaries (
+            conversation_id TEXT PRIMARY KEY,
+            title TEXT,
+            summary TEXT,
+            created_at INTEGER,
+            updated_at INTEGER,
+            workspace_uris TEXT,
+            parent_conversation_id TEXT,
+            nesting_depth INTEGER,
+            app_data_dir TEXT
+        );",
+    )
+    .unwrap();
+    let uris = serde_json::to_string(&vec![format!("file://{directory}")]).unwrap();
+    conn.execute(
+        "INSERT INTO conversation_summaries VALUES (?1, ?2, '', 1000, 2000, ?3, '', 0, 'antigravity-cli')",
+        rusqlite::params![AGY_ID, "Agy rate limiter", uris],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO conversation_summaries VALUES (?1, ?2, '', 1000, 1500, ?3, ?4, 1, 'antigravity-cli')",
+        rusqlite::params![AGY_CHILD_ID, "Agy subtask", uris, AGY_ID],
+    )
+    .unwrap();
+    parent_path
 }

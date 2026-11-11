@@ -44,6 +44,7 @@ fn classify_command(line: &str) -> Option<Kind> {
         "claude" | "claude-code" => return Some(Kind::Claude),
         "pi" => return Some(Kind::Pi),
         "opencode" => return Some(Kind::OpenCode),
+        "agy" | "antigravity-cli" => return Some(Kind::Agy),
         _ if VERSIONED_BINARY.is_match(exe) => return Some(Kind::Claude),
         _ => {}
     }
@@ -91,11 +92,17 @@ static PI_BUSY: LazyLock<Regex> = LazyLock::new(|| re(r"\(\S+ to interrupt\)"));
 static OPENCODE_BUSY: LazyLock<Regex> = LazyLock::new(|| re(r"\besc (?:again to )?interrupt\b"));
 /// opencode's tool permission dialog.
 static OPENCODE_ASKING: LazyLock<Regex> = LazyLock::new(|| re(r"Permission required|Allow once"));
+/// agy's footer while a turn runs: `esc to cancel`.
+static AGY_BUSY: LazyLock<Regex> = LazyLock::new(|| re(r"(?i)\besc to cancel\b"));
+/// agy's tool permission dialog.
+static AGY_ASKING: LazyLock<Regex> =
+    LazyLock::new(|| re(r"Requesting your permission:|Grant requested permission\?"));
 static IDLE_SUBAGENT: LazyLock<Regex> = LazyLock::new(|| re(r"^\s*◯.*\bidle\s*$"));
 /// Footer chrome rendered below a completed exchange, anchored at line start.
 /// The `gpt-` prefix is case-insensitive: current Codex prints `GPT-6 Astra`.
-static FOOTER: LazyLock<Regex> =
-    LazyLock::new(|| re(r"^\s*(⏵⏵|ctx [█░]|new task\?|✻|※|(?i:gpt)-[\w.\-]+\s|›)"));
+static FOOTER: LazyLock<Regex> = LazyLock::new(|| {
+    re(r"^\s*(⏵⏵|ctx [█░]|new task\?|\? for shortcuts|✻|※|(?i:gpt)-[\w.\-]+\s|›)")
+});
 /// Codex chrome to ignore when looking for its last content line.
 static CODEX_CHROME: LazyLock<Regex> =
     LazyLock::new(|| re(r"^\s*[›❯]|·|(?i:gpt)-[\d.]|^\s*─|esc to|tab to|^\s*$|^\s*[▌│]"));
@@ -110,6 +117,7 @@ pub fn detect_state(screen: &str, kind: Kind) -> State {
     let tail = tail_lines.join("\n");
     if (ASKING.is_match(&tail) && !footer_below_prompt(tail_lines))
         || (kind == Kind::OpenCode && OPENCODE_ASKING.is_match(&tail))
+        || (kind == Kind::Agy && AGY_ASKING.is_match(&tail) && !footer_below_prompt(tail_lines))
     {
         return State::Input;
     }
@@ -118,6 +126,7 @@ pub fn detect_state(screen: &str, kind: Kind) -> State {
     let kind_busy = match kind {
         Kind::Pi => PI_BUSY.is_match(&tail),
         Kind::OpenCode => OPENCODE_BUSY.is_match(&tail),
+        Kind::Agy => AGY_BUSY.is_match(&tail),
         Kind::Claude | Kind::Codex => false,
     };
     if kind_busy || BUSY.is_match(screen) {
@@ -163,7 +172,8 @@ static CLAUDE_MODEL: LazyLock<Regex> = LazyLock::new(|| {
 });
 static SEPARATOR_NAME: LazyLock<Regex> =
     LazyLock::new(|| re(r"─\s([A-Za-z0-9][A-Za-z0-9._-]{3,})\s─"));
-static ARGV_NAME: LazyLock<Regex> = LazyLock::new(|| re(r"--(?:resume|name)[= ](\S+)"));
+static ARGV_NAME: LazyLock<Regex> =
+    LazyLock::new(|| re(r"--(?:resume|name|conversation)[= ](\S+)"));
 static SPINNER: LazyLock<Regex> = LazyLock::new(|| re(r"^[✳*⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏\s]+"));
 static SHELL_TITLE: LazyLock<Regex> = LazyLock::new(|| re(r"[/\[\]]|\.lan$|\.local$"));
 static MULTI_SPACE: LazyLock<Regex> = LazyLock::new(|| re(r"\s{2,}"));
@@ -177,6 +187,14 @@ static PI_STATS: LazyLock<Regex> = LazyLock::new(|| {
     )
 });
 
+/// agy's footer line: `? for shortcuts` (or `esc to cancel` while busy, or
+/// blank while typing) on the left and `Model · effort` right-aligned.
+static AGY_FOOTER: LazyLock<Regex> = LazyLock::new(|| {
+    re(
+        r"^(?:(?:\? for shortcuts|(?i:esc to cancel))\b.*?\s{2,}|\s{2,})([^\s·][^·]*?)(?:\s+·\s+(\S+))?\s*$",
+    )
+});
+
 /// pi's stats line and the `pwd (branch)` line above it, from the bottom.
 fn pi_footer(screen: &str) -> Option<(regex::Captures<'_>, &str)> {
     let lines: Vec<&str> = screen.lines().collect();
@@ -184,6 +202,17 @@ fn pi_footer(screen: &str) -> Option<(regex::Captures<'_>, &str)> {
         let c = PI_STATS.captures(line)?;
         let pwd = i.checked_sub(1).map_or("", |j| lines[j].trim());
         Some((c, pwd))
+    })
+}
+
+fn agy_footer(screen: &str) -> Option<regex::Captures<'_>> {
+    let lines: Vec<&str> = screen.lines().collect();
+    lines.iter().enumerate().rev().find_map(|(i, line)| {
+        let has_rule = i
+            .checked_sub(1)
+            .is_some_and(|j| lines[j].trim_start().starts_with("───"));
+        let has_hint = line.trim_start().starts_with("? for shortcuts") || AGY_BUSY.is_match(line);
+        (has_rule || has_hint).then(|| AGY_FOOTER.captures(line))?
     })
 }
 
@@ -202,6 +231,7 @@ pub fn extract_model(screen: &str, kind: Kind) -> String {
         Kind::Codex => codex_status(screen).and_then(|c| c.get(1)),
         Kind::Claude => CLAUDE_MODEL.captures(screen).and_then(|c| c.get(1)),
         Kind::Pi => pi_footer(screen).and_then(|(c, _)| c.get(1)),
+        Kind::Agy => agy_footer(screen).and_then(|c| c.get(1)),
         // No recognisable model footer.
         Kind::OpenCode => None,
     };
@@ -250,6 +280,17 @@ pub fn extract_info(screen: &str, kind: Kind) -> String {
                     .flatten()
                     .map(|m| m.as_str().trim())
                     .chain(Some(pwd).filter(|p| !p.is_empty()))
+                    .collect();
+                prefix(&parts.join(" · "), 80).to_owned()
+            });
+        }
+        Kind::Agy => {
+            return agy_footer(screen).map_or_else(String::new, |c| {
+                let parts: Vec<&str> = c
+                    .iter()
+                    .skip(1)
+                    .flatten()
+                    .map(|m| m.as_str().trim())
                     .collect();
                 prefix(&parts.join(" · "), 80).to_owned()
             });
@@ -327,6 +368,19 @@ mod tests {
     $ rm -rf build/
    Allow once   Allow always   Reject";
 
+    const AGY_IDLE: &str = "  Here is the result.
+────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────
+? for shortcuts                                 Claude Opus 5.5 · medium";
+
+    const AGY_BUSY_SCREEN: &str = "● Explored 2 files
+⡿  Running command...
+────────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────────
+esc to cancel                                   Gemini 4 Argon · medium";
+
     #[test]
     fn classify_pi_and_opencode() {
         let cases = [
@@ -349,6 +403,9 @@ mod tests {
                 Kind::OpenCode,
             ),
             ("bun /x/node_modules/.bin/opencode", Kind::OpenCode),
+            ("agy --dangerously-skip-permissions", Kind::Agy),
+            ("/home/alice/.local/bin/agy --conversation 123", Kind::Agy),
+            ("antigravity-cli", Kind::Agy),
         ];
         for (argv, kind) in cases {
             assert_eq!(classify_argv(argv), Some(kind), "{argv}");
@@ -390,6 +447,12 @@ mod tests {
         // Kind-specific markers do not leak across harnesses.
         assert_eq!(detect_state(OPENCODE_ASKING, Kind::Pi), State::Idle);
         assert_eq!(detect_state(PI_BUSY, Kind::OpenCode), State::Idle);
+        assert_eq!(detect_state(AGY_IDLE, Kind::Agy), State::Idle);
+        assert_eq!(detect_state(AGY_BUSY_SCREEN, Kind::Agy), State::Busy);
+        assert_eq!(
+            detect_state("Requesting your permission:\n  1. Yes", Kind::Agy),
+            State::Input
+        );
     }
 
     #[test]
@@ -406,6 +469,16 @@ mod tests {
         assert_eq!(extract_info("plain prose 5%/1.0M", Kind::Pi), "");
         assert_eq!(extract_model(OPENCODE_BUSY, Kind::OpenCode), "");
         assert_eq!(extract_info(OPENCODE_BUSY, Kind::OpenCode), "");
+        assert_eq!(extract_model(AGY_IDLE, Kind::Agy), "Claude Opus 5.5");
+        assert_eq!(
+            extract_info(AGY_IDLE, Kind::Agy),
+            "Claude Opus 5.5 · medium"
+        );
+        assert_eq!(extract_model(AGY_BUSY_SCREEN, Kind::Agy), "Gemini 4 Argon");
+        assert_eq!(
+            extract_info(AGY_BUSY_SCREEN, Kind::Agy),
+            "Gemini 4 Argon · medium"
+        );
     }
 
     #[test]

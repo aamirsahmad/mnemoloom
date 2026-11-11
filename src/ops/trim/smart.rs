@@ -455,7 +455,7 @@ fn analyze(
     let instructions = a.instructions.unwrap_or(DEFAULT_INSTRUCTIONS);
     let prompt = build_prompt(a.cli, &repr_file, instructions);
     let args: Vec<String> = match a.cli {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => [
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => [
             "-p",
             "--no-session-persistence",
             "--output-format",
@@ -503,7 +503,7 @@ fn cli_error(e: std::io::Error) -> Failure {
 /// Codex `thread.started.thread_id`).
 fn helper_id(cli: Agent, stdout: &str) -> Option<String> {
     match cli {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => last_json_object(stdout)?
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => last_json_object(stdout)?
             .get("session_id")?
             .as_str()
             .map(str::to_string),
@@ -516,7 +516,7 @@ fn helper_id(cli: Agent, stdout: &str) -> Option<String> {
 /// The analysis prompt (Claude or Codex variant), verbatim.
 fn build_prompt(cli: Agent, repr_file: &Path, instructions: &str) -> String {
     let strategy = match cli {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => PROMPT_CLAUDE_STRATEGY,
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => PROMPT_CLAUDE_STRATEGY,
         Agent::Codex => PROMPT_CODEX_STRATEGY,
     };
     let head = PROMPT_HEAD
@@ -616,7 +616,7 @@ fn relevant_content(v: &Value, min: usize) -> Vec<(&'static str, String)> {
 /// noise skipped); Codex message / agent_message texts concatenated.
 fn response_text(cli: Agent, stdout: &str) -> Result<String, String> {
     match cli {
-        Agent::Claude | Agent::Pi | Agent::OpenCode => last_json_object(stdout)
+        Agent::Claude | Agent::Pi | Agent::OpenCode | Agent::Agy => last_json_object(stdout)
             .map(|v| v.get("result").map(py_str).unwrap_or_default())
             .ok_or_else(|| "JSON parse error: no JSON object in CLI output".to_string()),
         Agent::Codex => Ok(json_lines(stdout)

@@ -34,6 +34,10 @@ static ROLLOUT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^rollout-.*-([0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\.jsonl$")
         .expect("static regex")
 });
+static AGY_OPEN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12})\.(?:lock|db)$")
+        .expect("static regex")
+});
 
 /// Last-input timestamps per session id, and how much of history was read.
 type History = (HashMap<String, f64>, &'static str);
@@ -102,7 +106,7 @@ pub fn enrich(agents: &mut [Agent], procs: &Snapshot, open: &OpenRollouts, now: 
         agent.session_id = sid.clone();
         match &identity.record {
             Some(record) => apply_claude_record(agent, record),
-            None => {
+            None if agent.kind == Kind::Codex => {
                 let goal = goals.get(home).map_or("unknown", |rows| {
                     rows.get(sid).map_or("none", String::as_str)
                 });
@@ -111,6 +115,16 @@ pub fn enrich(agents: &mut [Agent], procs: &Snapshot, open: &OpenRollouts, now: 
                 }
                 agent.extra.goal_status = Some(goal.to_owned());
             }
+            None if agent.kind == Kind::Agy => {
+                if (agent.name.is_empty() || agent.name == *sid)
+                    && let Some(title) = mnemoloom::session::agy::summary_for(home, sid)
+                        .title
+                        .filter(|t| !t.is_empty())
+                {
+                    agent.name = title;
+                }
+            }
+            None => {}
         }
         agent.input_scope = "session".into();
         let (times, status) = histories
@@ -167,6 +181,19 @@ fn identify(
                 record: None,
             }
         }
+        Kind::Agy => {
+            agent.extra.activity_probe_ok = Some(open.is_some());
+            let paths = open
+                .as_ref()
+                .and_then(|open| open.get(&agent.pid))
+                .cloned()
+                .unwrap_or_default();
+            Identity {
+                method: "agy-open-lock",
+                matches: agy_matches(&paths, homes),
+                record: None,
+            }
+        }
         // pi appends to its session file without holding it open, and
         // opencode keeps sessions in SQLite, so `lsof` names neither.
         Kind::Pi | Kind::OpenCode => Identity {
@@ -208,6 +235,7 @@ pub fn profile_homes(kind: Kind) -> Vec<PathBuf> {
     let (agent, var) = match kind {
         Kind::Claude => (SessionAgent::Claude, "CLAUDE_CONFIG_DIR"),
         Kind::Codex => (SessionAgent::Codex, "CODEX_HOME"),
+        Kind::Agy => (SessionAgent::Agy, "AGY_HOME"),
         // No history or registry to read: input evidence stays unavailable.
         Kind::Pi | Kind::OpenCode => return Vec::new(),
     };
@@ -255,6 +283,7 @@ fn parse_history(data: &[u8], kind: Kind, now: f64) -> HashMap<String, f64> {
     let (text_key, sid_key, ts_key, scale) = match kind {
         Kind::Claude => ("display", "sessionId", "timestamp", 1000.0),
         Kind::Codex => ("text", "session_id", "ts", 1.0),
+        Kind::Agy => ("display", "conversationId", "timestamp", 1000.0),
         // Never identified (no homes), so never asked for history.
         Kind::Pi | Kind::OpenCode => return HashMap::new(),
     };
@@ -394,8 +423,10 @@ fn proc_fds(pids: &[u32]) -> HashMap<u32, Vec<PathBuf>> {
 }
 
 fn is_rollout(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|n| ROLLOUT.is_match(&n.to_string_lossy()))
+    path.file_name().is_some_and(|n| {
+        let s = n.to_string_lossy();
+        ROLLOUT.is_match(&s) || AGY_OPEN.is_match(&s)
+    })
 }
 
 fn codex_paths(open: &HashMap<u32, Vec<PathBuf>>, pids: &HashSet<u32>) -> Vec<PathBuf> {
@@ -421,6 +452,25 @@ fn rollout_matches(paths: &[PathBuf], homes: &[PathBuf]) -> Vec<(PathBuf, String
         homes
             .iter()
             .filter(move |home| path.starts_with(home.join("sessions")))
+            .filter_map(move |home| Some((home.clone(), uuid.clone()?)))
+    });
+    dedupe(pairs)
+}
+
+/// `(home, uuid)` for each open lock or conversation DB under an agy home.
+fn agy_matches(paths: &[PathBuf], homes: &[PathBuf]) -> Vec<(PathBuf, String)> {
+    let pairs = paths.iter().flat_map(|path| {
+        let uuid = path.file_name().and_then(|n| {
+            AGY_OPEN
+                .captures(&n.to_string_lossy())
+                .map(|c| c[1].to_owned())
+        });
+        homes
+            .iter()
+            .filter(move |home| {
+                path.starts_with(home.join("presence"))
+                    || path.starts_with(home.join("conversations"))
+            })
             .filter_map(move |home| Some((home.clone(), uuid.clone()?)))
     });
     dedupe(pairs)

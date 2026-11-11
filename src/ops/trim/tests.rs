@@ -784,6 +784,7 @@ mod in_place {
             codex_home: Some(dir.path().join("codex")),
             pi_home: Some(dir.path().join("pi")),
             opencode_home: Some(dir.path().join("opencode")),
+            agy_home: Some(dir.path().join("agy")),
         };
         let args = |session: &str| TrimInPlaceArgs {
             session: session.to_string(),

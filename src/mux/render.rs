@@ -148,7 +148,11 @@ mod tests {
     fn kind_column_fits_every_kind() {
         let mut a = agent();
         let baseline = row_parts(&a);
-        for (kind, text) in [(Kind::Pi, " pi       "), (Kind::OpenCode, " opencode ")] {
+        for (kind, text) in [
+            (Kind::Pi, " pi       "),
+            (Kind::OpenCode, " opencode "),
+            (Kind::Agy, " agy      "),
+        ] {
             a.kind = kind;
             let parts = row_parts(&a);
             assert!(parts.rest.starts_with(text), "{}", parts.rest);

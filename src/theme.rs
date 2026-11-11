@@ -19,6 +19,7 @@ pub const CLAUDE: Color = Color::Rgb(0xfe, 0x80, 0x19);
 pub const CODEX: Color = Color::Rgb(0x83, 0xa5, 0x98);
 pub const PI: Color = Color::Rgb(0xd3, 0x86, 0x9b);
 pub const OPENCODE: Color = Color::Rgb(0xb8, 0xbb, 0x26);
+pub const AGY: Color = Color::Rgb(0x7c, 0xb8, 0xff);
 /// User messages, checked boxes, live markers.
 pub const OK: Color = Color::Rgb(0x8e, 0xc0, 0x7c);
 /// Lineage and links.

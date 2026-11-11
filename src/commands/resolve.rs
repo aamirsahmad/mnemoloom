@@ -35,6 +35,7 @@ pub fn run(global: &GlobalArgs, args: &ResolveArgs) -> anyhow::Result<ExitCode> 
                 Agent::Codex => global.codex_home.as_deref(),
                 Agent::Pi => global.pi_home.as_deref(),
                 Agent::OpenCode => global.opencode_home.as_deref(),
+                Agent::Agy => global.agy_home.as_deref(),
             });
             resolve_in_home(&args.query, agent, home)
         });

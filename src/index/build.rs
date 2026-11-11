@@ -19,7 +19,7 @@ use super::schema::Fields;
 use super::store::{self, FileState, LockWait, Stamp, State};
 use crate::session::discover::{claude_session_paths, codex_session_paths};
 use crate::session::homes::normalize_path;
-use crate::session::{Agent, Homes, opencode, pi};
+use crate::session::{Agent, Homes, agy, opencode, pi};
 
 const WRITER_BUDGET: usize = 200_000_000;
 /// Below this many changed files one indexing thread suffices: the commit
@@ -42,6 +42,7 @@ pub struct UpdateStats {
     pub pi_files: usize,
     /// opencode sessions (DB rows).
     pub opencode_sessions: usize,
+    pub agy_files: usize,
     /// Notices for the user (version rebuilds).
     pub notes: Vec<String>,
     /// Another process holds the build lock (only with [`LockWait::Try`]).
@@ -146,12 +147,14 @@ pub fn update(
     let codex = codex_session_paths(&homes.codex);
     let pi = pi::session_paths(&homes.pi);
     let (rows, db_errors) = opencode::all_sessions(&homes.opencode);
+    let agy = agy::session_paths(&homes.agy);
     let mut stats = UpdateStats {
         claude_files: claude.len(),
         codex_files: codex.len(),
         pi_files: pi.len(),
         opencode_sessions: rows.len(),
-        total_files: claude.len() + codex.len() + pi.len() + rows.len(),
+        agy_files: agy.len(),
+        total_files: claude.len() + codex.len() + pi.len() + rows.len() + agy.len(),
         ..Default::default()
     };
     // With no sessions left, an existing index still needs pruning.
@@ -181,6 +184,7 @@ pub fn update(
             rows.iter()
                 .map(|r| (Agent::OpenCode, r.path(), Some(row_stamp(r)))),
         )
+        .chain(agy.into_iter().map(|p| (Agent::Agy, p, None)))
         .collect();
     let seen: HashSet<String> = files
         .iter()

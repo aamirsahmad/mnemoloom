@@ -1,7 +1,7 @@
 # mnemoloom
 
 Find, resume, trim and hand off your coding-agent sessions.
-Supports Claude Code, Codex, pi and opencode.
+Supports Claude Code, Codex, pi, opencode and agy.
 See all of your running agents in tmux on one screen.
 
 mnemoloom is one fast binary for macOS and Linux. It has no runtime dependencies.
@@ -11,7 +11,7 @@ mnemoloom is one fast binary for macOS and Linux. It has no runtime dependencies
 
 ## Features
 
-- **Search.** Full-text search over all Claude Code, Codex, pi and opencode sessions. Use the terminal UI, or get JSON lines for scripts and agents.
+- **Search.** Full-text search over all Claude Code, Codex, pi, opencode and agy sessions. Use the terminal UI, or get JSON lines for scripts and agents.
 - **Resume.** Open a session again in its agent, in the correct directory and account.
 - **Trim.** Make a session smaller. mnemoloom truncates large tool results and keeps a backup.
 - **Roll over.** Start a fresh session that continues the work of an old session. The new session links back to its parent.
@@ -24,7 +24,7 @@ mnemoloom is one fast binary for macOS and Linux. It has no runtime dependencies
 ## Requirements
 
 - macOS or Linux.
-- One or more of Claude Code, Codex, pi and opencode, to resume sessions.
+- One or more of Claude Code, Codex, pi, opencode and agy, to resume sessions.
 - tmux, for `mnemoloom mux`.
 - Rust 1.90 or later, to build from source.
 
@@ -58,16 +58,16 @@ ln -s "$(command -v mnemoloom)" "$(dirname "$(command -v mnemoloom)")/mloom"
 
 ## Agent support
 
-| Feature | Claude Code | Codex | pi | opencode |
-|---|---|---|---|---|
-| Search, info, lineage, export, query | Yes | Yes | Yes | Yes |
-| Resume | Yes | Yes | Yes | Yes |
-| mux detection | Yes | Yes | Yes | Yes |
-| Trim, roll over, port, clone | Yes | Yes | No | No |
-| Copy, move, delete | Yes | Yes | No | No |
-| Prompt hooks (plugin) | Yes | No | No | No |
+| Feature | Claude Code | Codex | pi | opencode | agy |
+|---|---|---|---|---|---|
+| Search, info, lineage, export, query | Yes | Yes | Yes | Yes | Yes |
+| Resume | Yes | Yes | Yes | Yes | Yes |
+| mux detection | Yes | Yes | Yes | Yes | Yes |
+| Trim, roll over, port, clone | Yes | Yes | No | No | No |
+| Copy, move, delete | Yes | Yes | No | No | No |
+| Prompt hooks (plugin) | Yes | No | No | No | No |
 
-mnemoloom reads pi and opencode data. It does not change pi or opencode session data.
+mnemoloom reads pi, opencode and agy data. It does not change pi, opencode or agy session data.
 
 ## Quick start
 
@@ -131,7 +131,7 @@ Each line is one session. The `lines` field is the number of user messages.
 
 ## mux
 
-`mnemoloom mux` lists every Claude Code, Codex, pi and opencode agent in your tmux panes.
+`mnemoloom mux` lists every Claude Code, Codex, pi, opencode and agy agent in your tmux panes.
 It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
 
 | Key | Action |
@@ -193,10 +193,11 @@ Type these words as a prompt:
 | `CODEX_HOME` | `~/.codex` | Codex home. `--codex-home` overrides it. |
 | `PI_CODING_AGENT_DIR` | `~/.pi/agent` | pi home. `--pi-home` overrides it. |
 | `XDG_DATA_HOME` | `~/.local/share` | opencode data is in `<this>/opencode`. `--opencode-home` overrides it. |
+| `AGY_HOME` | `~/.gemini/antigravity-cli` | agy home. `--agy-home` overrides it. |
 | `MNEMOLOOM_CACHE_DIR` | `$XDG_CACHE_HOME/mnemoloom` or `~/.cache/mnemoloom` | Root for all caches. |
 | `MNEMOLOOM_INDEX_DIR` | `<cache>/search-index` | Search index directory. |
 | `MNEMOLOOM_MUX_CACHE` | `<cache>/mux.json` | mux scan cache. |
-| `MNEMOLOOM_CLAUDE_BIN`, `MNEMOLOOM_CODEX_BIN`, `MNEMOLOOM_PI_BIN`, `MNEMOLOOM_OPENCODE_BIN` | `claude`, `codex`, `pi`, `opencode` | Agent binaries to run. |
+| `MNEMOLOOM_CLAUDE_BIN`, `MNEMOLOOM_CODEX_BIN`, `MNEMOLOOM_PI_BIN`, `MNEMOLOOM_OPENCODE_BIN`, `MNEMOLOOM_AGY_BIN` | `claude`, `codex`, `pi`, `opencode`, `agy` | Agent binaries to run. |
 | `MNEMOLOOM_TRIM_TIMEOUT` | `60` | Time limit in seconds for `>trim` in the hook. |
 
 mnemoloom reads session files. Only these commands change them:
@@ -207,7 +208,7 @@ mnemoloom reads session files. Only these commands change them:
 
 `trim`, `rollover`, `clone` and `port` write new session files. They do not change the original.
 `export` writes to `<project>/exported-sessions/` unless you give `-o`.
-mnemoloom never changes pi or opencode data.
+mnemoloom never changes pi, opencode or agy data.
 
 ## License
 

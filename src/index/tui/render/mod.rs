@@ -236,6 +236,7 @@ pub(super) fn agent_color(agent: Agent) -> ratatui::style::Color {
         Agent::Codex => theme::CODEX,
         Agent::Pi => theme::PI,
         Agent::OpenCode => theme::OPENCODE,
+        Agent::Agy => theme::AGY,
     }
 }
 

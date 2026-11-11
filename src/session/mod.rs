@@ -16,6 +16,7 @@
 //! - [`pyjson`]: Python `json.dumps`-compatible serialization.
 //! - [`timefmt`]: Python-compatible timestamp formatting.
 
+pub mod agy;
 pub mod codexdb;
 pub mod discover;
 pub mod encode;
@@ -53,49 +54,60 @@ pub enum Agent {
     Pi,
     /// opencode: rows in `<opencode home>/opencode*.db` (no per-session file).
     OpenCode,
+    /// Google Antigravity CLI (`agy`): JSONL step logs under `<agy home>/brain/<id>`.
+    Agy,
 }
 
 impl Agent {
     /// Every agent, in display / search order.
-    pub const ALL: [Agent; 4] = [Agent::Claude, Agent::Codex, Agent::Pi, Agent::OpenCode];
+    pub const ALL: [Agent; 5] = [
+        Agent::Claude,
+        Agent::Codex,
+        Agent::Pi,
+        Agent::OpenCode,
+        Agent::Agy,
+    ];
 
-    /// Lowercase wire name: `"claude"` / `"codex"` / `"pi"` / `"opencode"`.
+    /// Lowercase wire name: `"claude"` / `"codex"` / `"pi"` / `"opencode"` / `"agy"`.
     pub fn as_str(self) -> &'static str {
         match self {
             Agent::Claude => "claude",
             Agent::Codex => "codex",
             Agent::Pi => "pi",
             Agent::OpenCode => "opencode",
+            Agent::Agy => "agy",
         }
     }
 
-    /// Display label: `"Claude"` / `"Codex"` / `"pi"` / `"opencode"`.
+    /// Display label: `"Claude"` / `"Codex"` / `"pi"` / `"opencode"` / `"agy"`.
     pub fn label(self) -> &'static str {
         match self {
             Agent::Claude => "Claude",
             Agent::Codex => "Codex",
             Agent::Pi => "pi",
             Agent::OpenCode => "opencode",
+            Agent::Agy => "agy",
         }
     }
 
-    /// Three-cell badge: `CLD` / `CDX` / `PI ` / `OPC`.
+    /// Three-cell badge: `CLD` / `CDX` / `PI ` / `OPC` / `AGY`.
     pub fn badge(self) -> &'static str {
         match self {
             Agent::Claude => "CLD",
             Agent::Codex => "CDX",
             Agent::Pi => "PI ",
             Agent::OpenCode => "OPC",
+            Agent::Agy => "AGY",
         }
     }
 
-    /// The other agent (port / cross-agent rollover target). pi and
-    /// opencode sessions can't be ported or rolled over (see
+    /// The other agent (port / cross-agent rollover target). pi, opencode
+    /// and agy sessions can't be ported or rolled over (see
     /// [`Agent::require_rewritable`]); they map to Claude.
     pub fn other(self) -> Agent {
         match self {
             Agent::Claude => Agent::Codex,
-            Agent::Codex | Agent::Pi | Agent::OpenCode => Agent::Claude,
+            Agent::Codex | Agent::Pi | Agent::OpenCode | Agent::Agy => Agent::Claude,
         }
     }
 
@@ -125,6 +137,7 @@ impl Agent {
             "codex" => Some(Agent::Codex),
             "pi" => Some(Agent::Pi),
             "opencode" => Some(Agent::OpenCode),
+            "agy" => Some(Agent::Agy),
             _ => None,
         }
     }
@@ -162,24 +175,31 @@ pub fn session_uuid(filename_or_stem: &str) -> String {
 }
 
 /// Session UUID of a path (see [`session_uuid`]); the id part of an
-/// opencode virtual path (`<db>#<id>`, see [`opencode::split_virtual`]).
+/// opencode virtual path (`<db>#<id>`, see [`opencode::split_virtual`]) or
+/// the parent conversation dir of an agy `transcript.jsonl`.
 pub fn path_session_uuid(path: &Path) -> String {
     if let Some((_, id)) = opencode::split_virtual(path) {
+        return id;
+    }
+    if let Some(id) = agy::session_id_from_path(path) {
         return id;
     }
     session_uuid(&path.file_name().unwrap_or_default().to_string_lossy())
 }
 
-/// File stem of a session path; the session id for an opencode virtual path.
+/// File stem of a session path; the session id for an opencode virtual path
+/// or an agy `transcript.jsonl`.
 pub fn session_stem(path: &Path) -> String {
-    match opencode::split_virtual(path) {
-        Some((_, id)) => id,
-        None => path
-            .file_stem()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned(),
+    if let Some((_, id)) = opencode::split_virtual(path) {
+        return id;
     }
+    if let Some(id) = agy::session_id_from_path(path) {
+        return id;
+    }
+    path.file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned()
 }
 
 /// What the agent's resume flag takes: the transcript path for pi

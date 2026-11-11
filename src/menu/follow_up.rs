@@ -62,6 +62,7 @@ fn back_args(f: &TrimFollowUp) -> MenuArgs {
             Agent::Codex => AgentArg::Codex,
             Agent::Pi => AgentArg::Pi,
             Agent::OpenCode => AgentArg::OpenCode,
+            Agent::Agy => AgentArg::Agy,
         }),
         start_screen: StartScreen::Resume,
         ..Default::default()

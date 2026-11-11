@@ -115,8 +115,12 @@ pub fn wrong_agent_export(
     }
 }
 
-/// File name of a path as a string.
+/// File name of a path as a string (the conversation id for an `agy`
+/// `transcript.jsonl`).
 pub fn file_name(p: &Path) -> String {
+    if let Some(id) = crate::session::agy::session_id_from_path(p) {
+        return id;
+    }
     p.file_name()
         .unwrap_or_default()
         .to_string_lossy()
@@ -161,6 +165,7 @@ mod tests {
             codex_home: Some(codex),
             pi_home: Some(d.path().join("pi")),
             opencode_home: Some(d.path().join("opencode")),
+            agy_home: Some(d.path().join("agy")),
         };
         let not_found = || anyhow::Error::from(Exit::fail("Error: Session not found: x"));
         let msg = |e: anyhow::Error| e.downcast::<Exit>().unwrap().message.unwrap();
@@ -188,19 +193,25 @@ mod tests {
     fn rewriting_commands_refuse_pi_and_opencode() {
         use crate::cli::*;
         let d = tempfile::tempdir().unwrap();
-        let (pi, oc) = (d.path().join("pi"), d.path().join("opencode"));
+        let (pi, oc, agy) = (
+            d.path().join("pi"),
+            d.path().join("opencode"),
+            d.path().join("agy"),
+        );
         let pi_file = write_pi(&pi, PI_ID, "/w", &pi_lines(PI_ID, "/w"));
         write_opencode_db(&oc.join("opencode.db"), "/w", 1_000);
+        write_agy(&agy, "/w");
         let global = GlobalArgs {
             claude_home: Some(d.path().join("claude")),
             codex_home: Some(d.path().join("codex")),
             pi_home: Some(pi),
             opencode_home: Some(oc),
+            agy_home: Some(agy),
         };
         let msg = |r: anyhow::Result<std::process::ExitCode>| {
             r.unwrap_err().downcast::<Exit>().unwrap().message.unwrap()
         };
-        for (id, label) in [(PI_ID, "pi"), (OPENCODE_ID, "opencode")] {
+        for (id, label) in [(PI_ID, "pi"), (OPENCODE_ID, "opencode"), (AGY_ID, "agy")] {
             let refused =
                 |cmd: &str| format!("Error: \"{cmd}\" is not supported for {label} sessions yet.");
             let session = Some(id.to_string());

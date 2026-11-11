@@ -36,7 +36,7 @@ use crate::session::discover::{
     claude_session_paths, codex_session_paths, opencode_sessions, scan_paths,
 };
 use crate::session::homes::expand_tilde;
-use crate::session::{Agent, Depth, Homes, absolute, opencode, pi};
+use crate::session::{Agent, Depth, Homes, absolute, agy, opencode, pi};
 use build::UpdateStats;
 use dates::parse_date_now;
 use query::{Agents, Catalog, Filters, Row};
@@ -52,6 +52,7 @@ pub fn build_index(global: &GlobalArgs, args: &BuildIndexArgs) -> anyhow::Result
     let codex_n = codex_session_paths(&homes.codex).len();
     let pi_n = pi::session_paths(&homes.pi).len();
     let opencode_n = opencode::all_sessions(&homes.opencode).0.len();
+    let agy_n = agy::session_paths(&homes.agy).len();
     println!("Claude home: {} ({claude_n} files)", homes.claude.display());
     println!("Codex home:  {} ({codex_n} files)", homes.codex.display());
     if homes.has(Agent::Pi) {
@@ -63,9 +64,12 @@ pub fn build_index(global: &GlobalArgs, args: &BuildIndexArgs) -> anyhow::Result
             homes.opencode.display()
         );
     }
+    if homes.has(Agent::Agy) {
+        println!("agy home:    {} ({agy_n} files)", homes.agy.display());
+    }
     println!(
         "Total: {} session files to check",
-        claude_n + codex_n + pi_n + opencode_n
+        claude_n + codex_n + pi_n + opencode_n + agy_n
     );
     let started = std::time::Instant::now();
     let progress = |done: usize, total: usize| {
@@ -114,8 +118,8 @@ fn print_build_summary(s: &UpdateStats) {
         println!("   Failed:  0");
     }
     println!(
-        "   Total:   {} (Claude: {}, Codex: {}, pi: {}, opencode: {})",
-        s.total_files, s.claude_files, s.codex_files, s.pi_files, s.opencode_sessions
+        "   Total:   {} (Claude: {}, Codex: {}, pi: {}, opencode: {}, agy: {})",
+        s.total_files, s.claude_files, s.codex_files, s.pi_files, s.opencode_sessions, s.agy_files
     );
 }
 
@@ -208,6 +212,11 @@ fn scan_disk(homes: &Homes) -> DiskScan {
                 .into_iter()
                 .map(|p| (Agent::Pi, p)),
         )
+        .chain(
+            agy::session_paths(&homes.agy)
+                .into_iter()
+                .map(|p| (Agent::Agy, p)),
+        )
         .collect();
     let mut scan = DiskScan {
         files: Vec::new(),
@@ -243,8 +252,11 @@ fn kind(subagent: bool) -> &'static str {
 }
 
 fn file_name(p: &str) -> String {
-    Path::new(p)
-        .file_name()
+    let path = Path::new(p);
+    if let Some(id) = agy::session_id_from_path(path) {
+        return id;
+    }
+    path.file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default()
 }
@@ -298,6 +310,16 @@ fn stats_report(
         w(
             &mut o,
             format!("opencode subtask:   {}", count(Agent::OpenCode, true)),
+        );
+    }
+    if homes.has(Agent::Agy) {
+        w(
+            &mut o,
+            format!("agy resumable:      {}", count(Agent::Agy, false)),
+        );
+        w(
+            &mut o,
+            format!("agy subagent:       {}", count(Agent::Agy, true)),
         );
     }
     w(&mut o, format!("Total valid:      {}", disk.files.len()));
@@ -540,6 +562,7 @@ pub fn filters_from_args(
         SearchAgent::Codex => Agents::only(Agent::Codex),
         SearchAgent::Pi => Agents::only(Agent::Pi),
         SearchAgent::OpenCode => Agents::only(Agent::OpenCode),
+        SearchAgent::Agy => Agents::only(Agent::Agy),
         SearchAgent::All => Agents::ALL,
     };
     let date = |flag: &str, v: &Option<String>| -> anyhow::Result<_> {

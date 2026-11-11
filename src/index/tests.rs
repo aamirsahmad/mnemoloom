@@ -568,13 +568,15 @@ fn concurrent_updates_on_a_fresh_dir() {
     }
 }
 
-/// [`env`] with pi and opencode homes holding [`PI_ID`] (cwd `/w/a`) and
-/// the opencode parent + child (cwd `/w/a`), next to one Claude session.
+/// [`env`] with pi, opencode, and agy homes holding [`PI_ID`] (cwd `/w/a`),
+/// the opencode parent + child (cwd `/w/a`), and the agy parent + child
+/// (cwd `/w/a`), next to one Claude session.
 fn env_all_agents() -> Env {
     let root = tempfile::tempdir().unwrap();
     let homes = Homes::new(root.path().join("claude"), root.path().join("codex"))
         .with_pi(root.path().join("pi"))
         .with_opencode(root.path().join("opencode"))
+        .with_agy(root.path().join("agy"))
         .canonical();
     write_claude(
         &homes.claude,
@@ -588,6 +590,7 @@ fn env_all_agents() -> Env {
         "/w/a",
         1_792_644_400_000,
     );
+    write_agy(&homes.agy, "/w/a");
     let idx = root.path().join("idx");
     Env {
         _root: root,
@@ -600,9 +603,9 @@ fn env_all_agents() -> Env {
 fn pi_and_opencode_are_indexed_filtered_and_searched() {
     let e = env_all_agents();
     let cat = catalog(&e);
-    assert_eq!(cat.rows.len(), 4);
+    assert_eq!(cat.rows.len(), 6);
     let by_agent = |a: Agent| cat.rows.iter().filter(|r| r.agent == a).count();
-    assert_eq!(Agent::ALL.map(by_agent), [1, 0, 1, 2]);
+    assert_eq!(Agent::ALL.map(by_agent), [1, 0, 1, 2, 2]);
     let pi = cat.rows.iter().find(|r| r.agent == Agent::Pi).unwrap();
     assert_eq!((pi.session_id.as_str(), pi.lines), (PI_ID, 2));
     assert_eq!(pi.home, e.homes.pi.to_string_lossy());
@@ -613,6 +616,13 @@ fn pi_and_opencode_are_indexed_filtered_and_searched() {
         .unwrap();
     assert!(child.is_sidechain);
     assert_eq!(child.home, e.homes.opencode.to_string_lossy());
+    let agy_child = cat
+        .rows
+        .iter()
+        .find(|r| r.session_id == AGY_CHILD_ID)
+        .unwrap();
+    assert!(agy_child.is_sidechain);
+    assert_eq!(agy_child.home, e.homes.agy.to_string_lossy());
 
     let run = |f: &Filters, q: Option<&str>| {
         let tq = q.map(|q| query::run_query(&cat, q, f, SystemTime::now()));
@@ -624,15 +634,26 @@ fn pi_and_opencode_are_indexed_filtered_and_searched() {
         v
     };
     let mut f = filters(&e, "/w/a");
-    // Sidechains (the opencode child) hidden by default.
-    let mut all = vec![CLAUDE_ID.to_string(), PI_ID.into(), OPENCODE_ID.into()];
+    // Sidechains (the opencode + agy children) hidden by default.
+    let mut all = vec![
+        CLAUDE_ID.to_string(),
+        PI_ID.into(),
+        OPENCODE_ID.into(),
+        AGY_ID.into(),
+    ];
     all.sort();
     assert_eq!(run(&f, None), all);
     f.agents = Agents::only(Agent::Pi);
     assert_eq!(run(&f, None), [PI_ID]);
     f.agents = Agents::only(Agent::OpenCode);
     assert_eq!(run(&f, None), [OPENCODE_ID]);
+    f.agents = Agents::only(Agent::Agy);
+    assert_eq!(run(&f, None), [AGY_ID]);
     f.include_sub = true;
+    let mut ag = vec![AGY_ID.to_string(), AGY_CHILD_ID.into()];
+    ag.sort();
+    assert_eq!(run(&f, None), ag);
+    f.agents = Agents::only(Agent::OpenCode);
     let mut oc = vec![OPENCODE_ID.to_string(), OPENCODE_CHILD_ID.into()];
     oc.sort();
     assert_eq!(run(&f, None), oc);
@@ -640,10 +661,12 @@ fn pi_and_opencode_are_indexed_filtered_and_searched() {
     f.agents = Agents::ALL;
     assert_eq!(run(&f, Some("redis")), [PI_ID]);
     assert_eq!(run(&f, Some("explore")), [OPENCODE_CHILD_ID]);
-    // Another (or no) pi / opencode home hides those rows.
+    assert_eq!(run(&f, Some("subtask")), [AGY_CHILD_ID]);
+    // Another (or no) pi / opencode / agy home hides those rows.
     let mut g = filters(&e, "/w/a");
     g.pi_home = "/other".into();
     g.opencode_home = String::new();
+    g.agy_home = "/other".into();
     assert_eq!(run(&g, None), [CLAUDE_ID]);
     assert!(run(&g, Some("redis")).is_empty());
 }
@@ -657,6 +680,7 @@ fn search_agent_flag_maps_to_agent_sets() {
         (SearchAgent::Codex, Agents::only(Agent::Codex)),
         (SearchAgent::Pi, Agents::only(Agent::Pi)),
         (SearchAgent::OpenCode, Agents::only(Agent::OpenCode)),
+        (SearchAgent::Agy, Agents::only(Agent::Agy)),
     ] {
         let args = SearchArgs {
             agent,
@@ -695,4 +719,17 @@ fn json_lines_for_pi_and_opencode() {
     let child = json(OPENCODE_CHILD_ID);
     assert_eq!(child["agent"], "opencode");
     assert_eq!(child["is_sidechain"], true);
+    let ag = json(AGY_ID);
+    assert_eq!(ag["agent"], "agy");
+    assert_eq!(ag["custom_title"], "Agy rate limiter");
+    assert_eq!(ag["is_sidechain"], false);
+    assert!(
+        ag["file_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("transcript.jsonl")
+    );
+    let ag_child = json(AGY_CHILD_ID);
+    assert_eq!(ag_child["agent"], "agy");
+    assert_eq!(ag_child["is_sidechain"], true);
 }
