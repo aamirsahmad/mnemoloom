@@ -6,6 +6,13 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-10
+
+### Added
+
+- Support for `agy` (Google Antigravity CLI) sessions across `search`, `resume`, `info`, `resolve`, `lineage`, `export`, `query`, the interactive session menu, and `mux`. Like `pi` and `opencode`, `agy` session storage is read-only.
+- `--agy-home`, `AGY_HOME`, and `MNEMOLOOM_AGY_BIN` configuration options.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added
@@ -31,6 +38,7 @@ This project uses [Semantic Versioning](https://semver.org/).
 - `mux`: list and jump to coding agents in tmux panes, with a live preview.
 - Claude Code plugin with the `>resume`, `>session` and `>trim` prompt hooks, a session-search agent and skills.
 
-[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/aamirsahmad/mnemoloom/releases/tag/v0.1.0
