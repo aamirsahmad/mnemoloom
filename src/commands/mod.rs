@@ -8,6 +8,7 @@ pub mod lineage;
 pub mod move_account;
 pub mod resolve;
 pub mod resume;
+pub mod theme;
 
 use std::io::IsTerminal;
 use std::path::Path;

@@ -98,6 +98,7 @@ The first search builds the index. Later searches update only the changed files.
 | `query` | Ask an agent a question about a session. |
 | `build-index`, `index-stats`, `clear-index` | Manage the search index. |
 | `mux` | Show and jump to agents in tmux. See [mux](#mux). |
+| `theme` | List colour themes or set the active theme in `config.toml`. |
 
 Run `mnemoloom <command> --help` for all options.
 
@@ -117,6 +118,7 @@ Run `mnemoloom <command> --help` for all options.
 | `Enter` | Resume the session. |
 | `a` | Open the actions for the session. |
 | `y`, `x`, `t` | Copy the session ID. Export the session. Trim the session. |
+| `Ctrl-O` | Pick a colour theme with live preview (Enter saves to `config.toml`). |
 | `?` | Show all keys. |
 | `Esc` | Clear the query. Press again to quit. |
 | `q` | Quit. |
@@ -141,6 +143,7 @@ It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
 | `Tab`, `/` | Go to the list. Go back to the filter. |
 | `p` | In the list: show or hide the preview. |
 | `r` | In the list: refresh. |
+| `Ctrl-O` | Pick a colour theme with live preview (Enter saves to `config.toml`). |
 | `?` | In the list: show all keys. |
 
 The filter finds text in the agent fields and in the agent conversations.
@@ -199,6 +202,31 @@ Type these words as a prompt:
 | `MNEMOLOOM_MUX_CACHE` | `<cache>/mux.json` | mux scan cache. |
 | `MNEMOLOOM_CLAUDE_BIN`, `MNEMOLOOM_CODEX_BIN`, `MNEMOLOOM_PI_BIN`, `MNEMOLOOM_OPENCODE_BIN`, `MNEMOLOOM_AGY_BIN` | `claude`, `codex`, `pi`, `opencode`, `agy` | Agent binaries to run. |
 | `MNEMOLOOM_TRIM_TIMEOUT` | `60` | Time limit in seconds for `>trim` in the hook. |
+| `MNEMOLOOM_THEME` | `gruvbox-dark` | Override the TUI colour theme (e.g. `nord`, `one-dark`, `catppuccin-mocha`). |
+| `MNEMOLOOM_CONFIG` | `$XDG_CONFIG_HOME/mnemoloom/config.toml` or `~/.config/mnemoloom/config.toml` | Path to the TOML configuration file. |
+
+### Themes (`config.toml`)
+
+Press `Ctrl-O` in any TUI (`search`, `menu`, `mux`) to preview and save a colour theme, or use the CLI:
+
+```bash
+mnemoloom theme              # list built-in and custom themes
+mnemoloom theme nord         # save theme = "nord" to config.toml
+mnemoloom theme --path       # print the config.toml path
+```
+
+Built-in themes include `gruvbox-dark` (default), `gruvbox-light`, `nord`, `one-dark`, `catppuccin-mocha` (`catppuccin`), `catppuccin-macchiato`, `catppuccin-frappe`, `catppuccin-latte`, `dracula`, `tokyo-night`, `tokyo-night-storm`, `tokyo-night-day`, `solarized-dark`, `solarized-light`, `everforest-dark`, `everforest-light`, `rose-pine`, `rose-pine-moon`, `rose-pine-dawn`, `kanagawa`, `monokai`, `github-dark`, `github-light`, `ayu-dark`, and `terminal`.
+
+You can also set the theme or define custom palettes in `~/.config/mnemoloom/config.toml`:
+
+```toml
+theme = "catppuccin-mocha"
+
+[themes.my-nord]
+base = "nord"
+accent = "#88c0d0"
+bg = "default"
+```
 
 mnemoloom reads session files. Only these commands change them:
 

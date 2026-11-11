@@ -10,7 +10,7 @@ use crate::menu::state::{DIR_ITEMS, DirInfo, TrimInfo};
 use crate::theme;
 
 fn check() -> Span<'static> {
-    Span::styled("✓ ", Style::new().fg(theme::OK))
+    Span::styled("✓ ", Style::new().fg(theme::palette().ok))
 }
 
 pub(super) fn trim_confirm(b: &mut Body, info: &TrimInfo, cursor: usize) {

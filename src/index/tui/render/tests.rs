@@ -123,13 +123,14 @@ fn wide_layout_matches_the_mockup() {
     let f = fixture();
     let mut a = app(&f, "auth timeout");
     let b = render(&mut a, &f, 140, 36);
+    let pal = theme::palette();
     // Filters pane: 28 columns at the left.
     assert_eq!(find(&b, "FILTERS"), Some((3, 1)));
     assert_eq!(find(&b, "Agent"), Some((3, 3)));
     let claude = line(&b, 4);
     assert!(claude[..90].contains("[x] claude"), "{claude}");
     assert_eq!(b[(25, 4)].symbol(), "2", "count right-aligned");
-    assert_eq!(b[(3, 4)].fg, theme::OK);
+    assert_eq!(b[(3, 4)].fg, pal.ok);
     for s in [
         "Project",
         "[x] webapp",
@@ -151,14 +152,14 @@ fn wide_layout_matches_the_mockup() {
     // Results pane: query line, then cards; it has focus.
     assert_eq!(find(&b, "/ auth timeout"), Some((31, 1)));
     assert!(line(&b, 1).contains("3 hits · relevance"));
-    assert_eq!(b[(29, 0)].fg, theme::ACCENT);
-    assert_eq!(b[(0, 0)].fg, theme::BORDER);
+    assert_eq!(b[(29, 0)].fg, pal.accent);
+    assert_eq!(b[(0, 0)].fg, pal.border);
     let (bx, by) = find(&b, "CLD").unwrap();
     assert_eq!((bx, by), (32, 3));
-    assert_eq!(b[(bx, by)].fg, theme::CLAUDE);
+    assert_eq!(b[(bx, by)].fg, pal.claude);
     assert_eq!(b[(30, 3)].symbol(), "▌");
     assert_eq!(b[(30, 5)].symbol(), "▌");
-    assert_eq!(b[(40, 3)].bg, theme::BG_SEL);
+    assert_eq!(b[(40, 3)].bg, pal.bg_sel);
     assert_eq!(b[(30, 6)].symbol(), " ", "unselected cards have no bar");
     assert!(line(&b, 3).contains("Add CLI access to webapp"));
     assert!(line(&b, 4).contains("webapp @ al… · 42 user msgs · ● live"));
@@ -166,16 +167,16 @@ fn wide_layout_matches_the_mockup() {
     let (hx, hy) = find(&b, "…failing with an auth").unwrap();
     assert_eq!(hy, 5);
     let auth = hx + "…failing with an ".chars().count() as u16;
-    assert_eq!(b[(auth, 5)].bg, theme::MATCH);
-    assert_eq!(b[(hx + 1, 5)].fg, theme::FG_SOFT);
+    assert_eq!(b[(auth, 5)].bg, pal.matched);
+    assert_eq!(b[(hx + 1, 5)].fg, pal.fg_soft);
     // Preview pane: header block, transcript, footer.
     assert_eq!(find(&b, "Add CLI access to webapp"), Some((76, 1)));
     assert!(has(&b, "claude · 00000000 · 42 user msgs ·"));
     assert!(has(&b, "/w/webapp @ alice/ABC-123"));
     let (lx, ly) = find(&b, "lineage  b0b0cafe ─trim─▶ 00000000").unwrap();
-    assert_eq!(b[(lx, ly)].fg, theme::LINK);
+    assert_eq!(b[(lx, ly)].fg, pal.link);
     let (ux, uy) = find(&b, "    you the sync").unwrap();
-    assert_eq!(b[(ux + 4, uy)].fg, theme::OK);
+    assert_eq!(b[(ux + 4, uy)].fg, pal.ok);
     assert!(has(&b, " claude dex's default"));
     assert!(has(&b, "   tool Bash"));
     assert!(
@@ -192,8 +193,8 @@ fn wide_layout_matches_the_mockup() {
     );
     assert!(foot.trim_end().ends_with("? help  q quit"));
     assert_eq!(foot.trim_end().chars().count(), 140);
-    assert_eq!(b[(1, 35)].bg, theme::ACCENT);
-    assert_eq!(b[(0, 20)].bg, theme::BG, "frame background");
+    assert_eq!(b[(1, 35)].bg, pal.accent);
+    assert_eq!(b[(0, 20)].bg, pal.bg, "frame background");
 }
 
 #[test]
@@ -201,16 +202,17 @@ fn preview_highlights_current_match() {
     let f = fixture();
     let mut a = app(&f, "auth");
     let b = render(&mut a, &f, 140, 36);
+    let pal = theme::palette();
     let rows: Vec<u16> = (0..36)
         .filter(|&y| line(&b, y).contains("    you the sync"))
         .collect();
     let y = rows[0];
     let x = find(&b, "    you the sync").unwrap().0;
     let auth = x + "    you the sync keeps failing with an ".chars().count() as u16;
-    assert_eq!(b[(auth, y)].bg, theme::ACCENT, "current match");
+    assert_eq!(b[(auth, y)].bg, pal.accent, "current match");
     let (cx, cy) = find(&b, " claude dex's default ").unwrap();
     let other = cx + " claude dex's default ".chars().count() as u16;
-    assert_eq!(b[(other, cy)].bg, theme::MATCH, "other match");
+    assert_eq!(b[(other, cy)].bg, pal.matched, "other match");
     // n moves the current match.
     a.on_key(crossterm::event::KeyEvent::from(
         crossterm::event::KeyCode::Char('n'),
@@ -225,6 +227,7 @@ fn focus_and_query_mode_show_in_chrome() {
     let mut a = app(&f, "");
     assert_eq!(a.mode, Mode::Query);
     let b = render(&mut a, &f, 140, 36);
+    let pal = theme::palette();
     assert!(line(&b, 35).starts_with(" QUERY "));
     assert!(line(&b, 35).trim_end().ends_with("esc results"));
     assert!(has(&b, "/ ▏"));
@@ -234,11 +237,11 @@ fn focus_and_query_mode_show_in_chrome() {
     let b = render(&mut a, &f, 140, 36);
     assert!(line(&b, 35).starts_with(" FILTERS "));
     assert!(has(&b, "press / to search"));
-    assert_eq!(b[(0, 0)].fg, theme::ACCENT);
-    assert_eq!(b[(29, 0)].fg, theme::BORDER);
+    assert_eq!(b[(0, 0)].fg, pal.accent);
+    assert_eq!(b[(29, 0)].fg, pal.border);
     // The facet cursor: ACCENT bar + selected background.
     assert_eq!(b[(1, 4)].symbol(), "▌");
-    assert_eq!(b[(10, 4)].bg, theme::BG_SEL);
+    assert_eq!(b[(10, 4)].bg, pal.bg_sel);
     a.focus = Focus::Preview;
     let b = render(&mut a, &f, 140, 36);
     assert!(line(&b, 35).starts_with(" PREVIEW "));
@@ -337,6 +340,7 @@ fn help_overlay_and_full_view() {
 fn project_picker_overlay() {
     let f = fixture();
     let mut a = app(&f, "auth");
+    let pal = theme::palette();
     a.counts.projects = (0..40).map(|i| (format!("proj{i:02}"), 50 - i)).collect();
     a.projects.hidden.insert("proj01".into());
     a.mode = Mode::Normal;
@@ -344,7 +348,7 @@ fn project_picker_overlay() {
     a.facet_cursor = 5 + facets::TOP_PROJECTS;
     let b = render(&mut a, &f, 140, 36);
     let (mx, my) = find(&b, "…32 more  ⏎ all").expect("more row");
-    assert_eq!(b[(mx, my)].fg, theme::DIM);
+    assert_eq!(b[(mx, my)].fg, pal.dim);
     assert_eq!(b[(1, my)].symbol(), "▌", "the more row takes the cursor");
     assert!(line(&b, 35).contains("o only"));
 
@@ -356,11 +360,11 @@ fn project_picker_overlay() {
     assert!(has(&b, " PROJECTS "));
     let (px, py) = find(&b, "/ proj▏").unwrap();
     assert!(line(&b, py).contains("40 projects"));
-    assert_eq!(b[(px - 2, py - 1)].fg, theme::ACCENT, "accent border");
+    assert_eq!(b[(px - 2, py - 1)].fg, pal.accent, "accent border");
     // Scrolled so the cursor row (proj30) is visible, with the bar.
     let (cx, cy) = find(&b, "[x] proj30").unwrap();
     assert_eq!(b[(cx - 2, cy)].symbol(), "▌");
-    assert_eq!(b[(cx, cy)].bg, theme::BG_SEL);
+    assert_eq!(b[(cx, cy)].bg, pal.bg_sel);
     assert!(line(&b, cy).contains(" 20 "));
     assert!(
         find(&b, "proj00").is_none_or(|(x, _)| x < 28),
@@ -377,7 +381,7 @@ fn project_picker_overlay() {
     let b = render(&mut a, &f, 140, 36);
     assert!(has(&b, "10 projects"));
     let (ux, uy) = find(&b, "[ ] proj01").unwrap();
-    assert_eq!(b[(ux, uy)].fg, theme::DIM);
+    assert_eq!(b[(ux, uy)].fg, pal.dim);
     for (w, h) in [(10, 4), (30, 6)] {
         render(&mut a, &f, w, h);
     }
@@ -416,6 +420,7 @@ fn layered_spans() {
     let p = vec![4..7, 20..21];
     let hl = theme::hit_current();
     let qs = theme::hit();
+    let pal = theme::palette();
     let out = spans(
         "Foo bar foo",
         2..11,
@@ -424,8 +429,8 @@ fn layered_spans() {
     );
     let texts: Vec<&str> = out.iter().map(|s| s.content.as_ref()).collect();
     assert_eq!(texts, ["o", " ", "bar", " ", "foo"]);
-    assert_eq!(out[2].style.bg, Some(theme::ACCENT));
-    assert_eq!(out[0].style.bg, Some(theme::MATCH));
+    assert_eq!(out[2].style.bg, Some(pal.accent));
+    assert_eq!(out[0].style.bg, Some(pal.matched));
     let s = Snippet {
         text: "alpha beta\ngamma".into(),
         highlights: std::iter::once(6..10).collect(),
@@ -443,10 +448,11 @@ fn pi_and_opencode_badges_facets_and_preview() {
     f.rows[1].derivation_type = String::new();
     let mut a = app(&f, "auth");
     let b = render(&mut a, &f, 140, 36);
+    let pal = theme::palette();
     let (px, py) = find(&b, "PI ").expect("pi badge");
-    assert_eq!((b[(px, py)].fg, b[(px + 1, py)].fg), (theme::PI, theme::PI));
+    assert_eq!((b[(px, py)].fg, b[(px + 1, py)].fg), (pal.pi, pal.pi));
     let (ox, oy) = find(&b, "OPC").expect("opencode badge");
-    assert_eq!(b[(ox, oy)].fg, theme::OPENCODE);
+    assert_eq!(b[(ox, oy)].fg, pal.opencode);
     assert!(oy > py, "cards in result order");
     // All five agents in the filter pane, with counts.
     for (i, name) in ["claude", "codex", "pi", "opencode", "agy"]
@@ -464,5 +470,5 @@ fn pi_and_opencode_badges_facets_and_preview() {
     // The preview header names the agent; the gutter labels pi's replies.
     assert!(has(&b, "pi · 00000000"));
     let (gx, gy) = find(&b, "    pi dex's default").expect("pi gutter");
-    assert_eq!(b[(gx + 4, gy)].fg, theme::PI);
+    assert_eq!(b[(gx + 4, gy)].fg, pal.pi);
 }

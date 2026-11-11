@@ -86,7 +86,7 @@ impl Body {
             let lead = if i == 0 { "  › " } else { "    " };
             let mut spans = vec![Span::styled(lead, mark), Span::styled(row, style)];
             if focused && i == last {
-                spans.push(Span::styled(" ", Style::new().bg(theme::FG)));
+                spans.push(Span::styled(" ", Style::new().bg(theme::palette().fg)));
             }
             self.push(Line::from(spans));
         }
@@ -110,6 +110,7 @@ impl Body {
 
     /// Numbered rows `1  Label`; the selected one gets the bar + BG_SEL.
     pub(super) fn items(&mut self, labels: &[&str], cursor: usize) {
+        let bg_sel = theme::palette().bg_sel;
         for (i, label) in labels.iter().enumerate() {
             let selected = i == cursor;
             if selected {
@@ -119,10 +120,10 @@ impl Body {
             let rest = self.width.saturating_sub(1 + display_width(&num));
             let label = fit(label, rest, false);
             self.push(if selected {
-                let sel = Style::new().bg(theme::BG_SEL);
+                let sel = Style::new().bg(bg_sel);
                 Line::from(vec![
-                    Span::styled(BAR, theme::heading().bg(theme::BG_SEL)),
-                    Span::styled(num, theme::heading().bg(theme::BG_SEL)),
+                    Span::styled(BAR, theme::heading().bg(bg_sel)),
+                    Span::styled(num, theme::heading().bg(bg_sel)),
                     Span::styled(label, bold(theme::text()).patch(sel)),
                 ])
             } else {
@@ -278,7 +279,7 @@ fn results(b: &mut Body, ctx: &Ctx, cursor: usize) {
             b.focus_here();
         }
         let bg = if selected {
-            Style::new().bg(theme::BG_SEL)
+            Style::new().bg(theme::palette().bg_sel)
         } else {
             Style::new()
         };

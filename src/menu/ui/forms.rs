@@ -122,7 +122,10 @@ pub(super) fn continue_form(b: &mut Body, f: &ContinueForm) {
 pub(super) fn query(b: &mut Body, q: &QueryForm) {
     b.blank();
     if let Some(err) = &q.error {
-        b.push(Line::styled(err.clone(), Style::new().fg(theme::WARN)));
+        b.push(Line::styled(
+            err.clone(),
+            Style::new().fg(theme::palette().warn),
+        ));
         return;
     }
     let (value, placeholder) = input_value(&q.input, QUERY_DEFAULT, "type query...");
@@ -138,7 +141,10 @@ pub(super) fn query(b: &mut Body, q: &QueryForm) {
 pub(super) fn nonlaunch(b: &mut Body, s: &SessionView, nl: &NonLaunch) {
     b.blank();
     if let Some(err) = &nl.error {
-        b.push(Line::styled(err.clone(), Style::new().fg(theme::WARN)));
+        b.push(Line::styled(
+            err.clone(),
+            Style::new().fg(theme::palette().warn),
+        ));
         return;
     }
     match nl.kind {

@@ -252,8 +252,10 @@ impl Bg {
 
 /// Run the TUI until quit.
 pub fn run(l: Launch) -> anyhow::Result<ExitCode> {
+    let warnings = crate::theme::init();
     let mut model = Model::new(Catalog::open(&l.index_dir, &l.homes).unwrap_or(None));
     let mut app = App::new(l.filters.clone(), l.query.clone(), l.by_time, l.limit);
+    app.status = warnings.into_iter().next();
     app.current_branch = current_git_branch(Path::new(&app.filters.launch_cwd));
     model.refilter(&mut app, false);
     let mut terminal = ratatui::try_init()?;

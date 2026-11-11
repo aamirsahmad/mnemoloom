@@ -126,7 +126,7 @@ fn header(r: &Row, parent: Option<&(Derivation, String)>, width: usize) -> Vec<L
         };
         lines.push(Line::styled(
             truncate(&format!("lineage  {pid} ─{how}─▶ {id}"), width),
-            Style::new().fg(theme::LINK),
+            Style::new().fg(theme::palette().link),
         ));
     }
     lines
@@ -211,7 +211,7 @@ fn transcript(v: &ViewState, height: u16) -> Vec<Line<'static>> {
         }
         let Some((_, q, p, c)) = &cache else { continue };
         let (role, base) = match line.kind {
-            Kind::User => (Style::new().fg(theme::OK), theme::text()),
+            Kind::User => (Style::new().fg(theme::palette().ok), theme::text()),
             Kind::Assistant => (Style::new().fg(agent_color(agent)), theme::text()),
             Kind::Tool => (theme::dim(), theme::dim()),
             Kind::Plain => (theme::dim(), theme::text()),

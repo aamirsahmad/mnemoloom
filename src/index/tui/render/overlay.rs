@@ -22,6 +22,7 @@ pub fn draw(frame: &mut Frame, app: &App, data: &Data, area: Rect) {
         Mode::Scope(sel) => scope_modal(frame, app, *sel, area),
         Mode::Actions(sel) => action_modal(frame, *sel, area),
         Mode::Projects { query, cursor } => projects_modal(frame, app, query, *cursor, area),
+        Mode::Theme(picker) => theme::picker::draw(frame, picker, area),
         Mode::ConfirmExit => exit_modal(frame, area),
         Mode::ConfirmDelete => {
             if let Some(r) = app.selected_row().map(|i| &data.rows[i]) {
@@ -50,7 +51,7 @@ fn modal(frame: &mut Frame, area: Rect, w: u16, h: u16, title: &str) -> Rect {
             format!(" {title} "),
             theme::heading().add_modifier(Modifier::BOLD),
         ))
-        .style(theme::text().bg(theme::BG));
+        .style(theme::text().bg(theme::palette().bg));
     let inner = block.inner(r);
     frame.render_widget(block, r);
     inner.inner(ratatui::layout::Margin::new(1, 0))
@@ -59,7 +60,7 @@ fn modal(frame: &mut Frame, area: Rect, w: u16, h: u16, title: &str) -> Rect {
 /// A list row: ACCENT `▌` + BG_SEL when selected.
 fn menu_line(selected: bool, label: String, extra: Vec<Span<'static>>) -> Line<'static> {
     let st = if selected {
-        theme::text().bg(theme::BG_SEL)
+        theme::text().bg(theme::palette().bg_sel)
     } else {
         theme::text()
     };
@@ -80,6 +81,7 @@ const HELP: &[(&str, &[(&str, &str)])] = &[
             ("j/k  ↑/↓  PgUp/PgDn", "move in the focused pane"),
             ("g/G  Home/End", "first / last"),
             ("f / p", "show or hide filters / preview"),
+            ("^o", "colour theme"),
             ("esc", "back to results; clear the query; quit"),
             ("q  ^c", "quit"),
         ],
@@ -172,7 +174,7 @@ fn filter_modal(frame: &mut Frame, app: &App, sel: usize, area: Rect) {
             menu_line(
                 i == sel,
                 item.label().to_string(),
-                vec![Span::styled(state, Style::new().fg(theme::OK))],
+                vec![Span::styled(state, Style::new().fg(theme::palette().ok))],
             )
         })
         .collect();
@@ -210,6 +212,7 @@ fn scope_modal(frame: &mut Frame, app: &App, sel: usize, area: Rect) {
             custom,
         ),
     ];
+    let ok = theme::palette().ok;
     let lines: Vec<Line> = items
         .into_iter()
         .enumerate()
@@ -218,7 +221,7 @@ fn scope_modal(frame: &mut Frame, app: &App, sel: usize, area: Rect) {
                 i == sel,
                 label,
                 vec![
-                    Span::styled(if active { " ●" } else { " ○" }, Style::new().fg(theme::OK)),
+                    Span::styled(if active { " ●" } else { " ○" }, Style::new().fg(ok)),
                     Span::styled(suffix, theme::dim()),
                 ],
             )
@@ -258,10 +261,11 @@ fn projects_modal(frame: &mut Frame, app: &App, query: &str, cursor: usize, area
     let rows = usize::from(list.height);
     let cursor = cursor.min(items.len().saturating_sub(1));
     let skip = (cursor + 1).saturating_sub(rows);
+    let pal = theme::palette();
     for (i, (p, count)) in items.iter().enumerate().skip(skip).take(rows) {
         let selected = i == cursor;
         let (mark, mark_st, label_st) = if app.projects.shows(p) {
-            ("[x]", Style::new().fg(theme::OK), theme::text())
+            ("[x]", Style::new().fg(pal.ok), theme::text())
         } else {
             ("[ ]", theme::dim(), theme::dim())
         };
@@ -273,7 +277,7 @@ fn projects_modal(frame: &mut Frame, app: &App, query: &str, cursor: usize, area
             ..list
         };
         if selected {
-            fill(frame, line_area, Style::new().bg(theme::BG_SEL));
+            fill(frame, line_area, Style::new().bg(pal.bg_sel));
         }
         let line = Line::from(vec![
             bar(selected),
@@ -344,7 +348,9 @@ fn delete_modal(frame: &mut Frame, r: &Row, area: Rect) {
         Line::default(),
         Line::styled(
             "This action cannot be undone!",
-            Style::new().fg(theme::WARN).add_modifier(Modifier::BOLD),
+            Style::new()
+                .fg(theme::palette().warn)
+                .add_modifier(Modifier::BOLD),
         ),
         Line::default(),
         key_line(&[("⏎", "confirm delete"), ("esc", "cancel")]),

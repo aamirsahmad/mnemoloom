@@ -87,14 +87,15 @@ fn action_screen_wide() {
     let (ax, ay) = find(&b, "╭ ACTIONS");
     assert!(sx < ax && sy == ay);
     // Selected row: accent bar on the selection background.
+    let pal = theme::palette();
     let (x, y) = find(&b, "▌ 2  Copy");
-    assert_eq!(b[(x, y)].fg, theme::ACCENT);
-    assert_eq!(b[(x + 6, y)].bg, theme::BG_SEL);
-    assert_eq!(b[(x + 6, y - 1)].bg, theme::BG);
+    assert_eq!(b[(x, y)].fg, pal.accent);
+    assert_eq!(b[(x + 6, y)].bg, pal.bg_sel);
+    assert_eq!(b[(x + 6, y - 1)].bg, pal.bg);
     // Focused pane border is ACCENT, the other BORDER; chip inverse.
-    assert_eq!(b[(ax, ay)].fg, theme::ACCENT);
-    assert_eq!(b[(sx, sy)].fg, theme::BORDER);
-    assert_eq!(b[(1, 29)].bg, theme::ACCENT);
+    assert_eq!(b[(ax, ay)].fg, pal.accent);
+    assert_eq!(b[(sx, sy)].fg, pal.border);
+    assert_eq!(b[(1, 29)].bg, pal.accent);
 }
 
 #[test]
@@ -137,7 +138,7 @@ fn header_lineage_and_sidechain() {
     assert!(t.contains("⚠ Sub-agent session (not resumable)"));
     assert!(!t.contains("Resume/trim"), "sub-agents have no resume item");
     let (x, y) = find(&b, "lineage");
-    assert_eq!(b[(x, y)].fg, theme::LINK);
+    assert_eq!(b[(x, y)].fg, theme::palette().link);
     let lines = session_lines(&ss[0], 40);
     assert_eq!(lines[0].spans[0].content, "Fix login flow");
     // Details still loading.
@@ -202,12 +203,13 @@ fn trim_form() {
     assert!(t.contains("│   › (skip)"));
     assert!(t.contains(" TRIM   ⏎ next/submit  ↑/↓ field"));
     assert!(rows(&b)[29].ends_with("esc back"));
+    let pal = theme::palette();
     let (x, y) = find(&b, "▌ Length");
-    assert_eq!(b[(x + 2, y)].fg, theme::ACCENT);
+    assert_eq!(b[(x + 2, y)].fg, pal.accent);
     let (x, y) = find(&b, "  Tools to trim");
-    assert_eq!(b[(x + 2, y)].fg, theme::DIM);
+    assert_eq!(b[(x + 2, y)].fg, pal.dim);
     let (x, y) = find(&b, "500");
-    assert_eq!((b[(x, y)].fg, b[(x + 3, y)].bg), (theme::FG, theme::FG));
+    assert_eq!((b[(x, y)].fg, b[(x + 3, y)].bg), (pal.fg, pal.fg));
     // Narrow: hints wrap; the focused field scrolls into view.
     let (_, _, n2) = at(
         &one(),
@@ -229,7 +231,11 @@ fn smart_trim_and_query() {
     assert!(t.contains("Tell the agent what to look for when trimming"));
     assert!(t.contains("trim messages that are not relevant"));
     let (x, y) = find(&b, "trim messages that");
-    assert_eq!(b[(x, y)].fg, theme::DIM, "untyped default is a placeholder");
+    assert_eq!(
+        b[(x, y)].fg,
+        theme::palette().dim,
+        "untyped default is a placeholder"
+    );
 
     let (_, b, n) = at(&one(), StartScreen::Query, &[]);
     let t = text(&b);
@@ -321,9 +327,10 @@ fn results_picker() {
     assert!(t.contains(" SESSIONS   ⏎ select  j/k move  1-9 jump  esc quit"));
     // SESSION pane follows the hovered candidate.
     assert!(t.contains("codex · bbbb2222"), "{t}");
+    let pal = theme::palette();
     let (x, y) = find(&b, " 2  CDX");
-    assert_eq!(b[(x - 1, y)].fg, theme::ACCENT);
-    assert_eq!(b[(x, y + 1)].bg, theme::BG_SEL);
+    assert_eq!(b[(x - 1, y)].fg, pal.accent);
+    assert_eq!(b[(x, y + 1)].bg, pal.bg_sel);
     let t = text(&n);
     assert!(
         t.contains("▌ 2  CDX bbbb2222") && !t.contains("╭ SESSION"),

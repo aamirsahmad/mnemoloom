@@ -68,23 +68,18 @@ pub fn session_lines(s: &SessionView, width: usize) -> Vec<Line<'static>> {
         dim(truncate(&meta.join(" · "), width)),
         dim(truncate(&place, width)),
     ];
+    let pal = theme::palette();
     if let Some(l) = lineage_line(s) {
-        out.push(Line::styled(
-            truncate(&l, width),
-            Style::new().fg(theme::LINK),
-        ));
+        out.push(Line::styled(truncate(&l, width), Style::new().fg(pal.link)));
     }
     if s.is_sidechain {
         out.push(Line::styled(
             "⚠ Sub-agent session (not resumable)",
-            Style::new().fg(theme::WARN),
+            Style::new().fg(pal.warn),
         ));
     }
-    out.push(Line::styled(
-        "─".repeat(width),
-        Style::new().fg(theme::BORDER),
-    ));
-    let soft = Style::new().fg(theme::FG_SOFT);
+    out.push(Line::styled("─".repeat(width), Style::new().fg(pal.border)));
+    let soft = Style::new().fg(pal.fg_soft);
     if let Some(first) = &s.first_message {
         out.push(heading("First user message"));
         out.extend(wrapped(first, width, 4, soft));

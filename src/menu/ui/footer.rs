@@ -25,7 +25,7 @@ const BACK: (&str, &str) = ("esc", "back");
 fn keys(state: &State) -> Keys {
     let list = |chip, esc| Keys {
         chip,
-        hints: LIST.into_iter().chain([esc]).collect(),
+        hints: LIST.into_iter().chain([esc, ("^o", "theme")]).collect(),
         right: vec![HELP],
     };
     let text = |chip, hints: &[(&'static str, &'static str)]| Keys {
@@ -88,7 +88,13 @@ fn spans_width(spans: &[Span]) -> usize {
 
 /// ` ACTIONS   ⏎ select  j/k move ...            ? help` at `width`.
 pub fn footer_line(state: &State, width: u16) -> Line<'static> {
-    let k = if state.help {
+    let k = if state.theme_picker.is_some() {
+        Keys {
+            chip: "THEME",
+            hints: vec![("type", "filter"), ("↑/↓", "move"), ("⏎", "apply")],
+            right: vec![("esc", "cancel")],
+        }
+    } else if state.help {
         Keys {
             chip: "HELP",
             hints: vec![("any key", "close")],
@@ -121,6 +127,9 @@ fn help_rows(state: &State) -> Vec<(&'static str, &'static str)> {
     let k = keys(state);
     let mut rows = k.hints;
     rows.extend(k.right.into_iter().filter(|r| *r != HELP));
+    if !rows.iter().any(|(k, _)| *k == "^o") {
+        rows.push(("^o", "colour theme"));
+    }
     if !state.text_entry() {
         rows.push(("q", "same as esc"));
         rows.push(HELP);
@@ -156,7 +165,7 @@ pub(super) fn draw_help(frame: &mut Frame, area: Rect, state: &State) {
         height: h,
     };
     let block = pane(Span::styled(" KEYS ", bold(theme::heading())), true)
-        .style(Style::new().bg(theme::BG));
+        .style(Style::new().bg(theme::palette().bg));
     frame.render_widget(Clear, rect);
     frame.render_widget(Paragraph::new(lines).block(block), rect);
 }

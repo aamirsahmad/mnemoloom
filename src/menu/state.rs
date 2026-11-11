@@ -18,10 +18,15 @@ use crate::session::Agent;
 pub enum Key {
     Up,
     Down,
+    PageUp,
+    PageDown,
+    Home,
+    End,
     Enter,
     Esc,
     Backspace,
     Char(char),
+    Ctrl(char),
     /// Ctrl-C: leave immediately.
     Interrupt,
     Other,
@@ -32,12 +37,17 @@ impl From<KeyEvent> for Key {
         if k.modifiers.contains(KeyModifiers::CONTROL) {
             return match k.code {
                 KeyCode::Char('c') => Key::Interrupt,
+                KeyCode::Char(c) => Key::Ctrl(c),
                 _ => Key::Other,
             };
         }
         match k.code {
             KeyCode::Up => Key::Up,
             KeyCode::Down => Key::Down,
+            KeyCode::PageUp => Key::PageUp,
+            KeyCode::PageDown => Key::PageDown,
+            KeyCode::Home => Key::Home,
+            KeyCode::End => Key::End,
             KeyCode::Enter => Key::Enter,
             KeyCode::Esc => Key::Esc,
             KeyCode::Backspace | KeyCode::Delete => Key::Backspace,
@@ -51,6 +61,24 @@ impl Key {
     /// Key presses only (no repeats/releases on platforms that report them).
     pub fn from_event(k: KeyEvent) -> Option<Key> {
         (k.kind != KeyEventKind::Release).then(|| Key::from(k))
+    }
+
+    fn to_key_event(self) -> KeyEvent {
+        match self {
+            Key::Up => KeyEvent::from(KeyCode::Up),
+            Key::Down => KeyEvent::from(KeyCode::Down),
+            Key::PageUp => KeyEvent::from(KeyCode::PageUp),
+            Key::PageDown => KeyEvent::from(KeyCode::PageDown),
+            Key::Home => KeyEvent::from(KeyCode::Home),
+            Key::End => KeyEvent::from(KeyCode::End),
+            Key::Enter => KeyEvent::from(KeyCode::Enter),
+            Key::Esc => KeyEvent::from(KeyCode::Esc),
+            Key::Backspace => KeyEvent::from(KeyCode::Backspace),
+            Key::Char(c) => KeyEvent::from(KeyCode::Char(c)),
+            Key::Ctrl(c) => KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL),
+            Key::Interrupt => KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            Key::Other => KeyEvent::from(KeyCode::Null),
+        }
     }
 }
 
@@ -283,6 +311,8 @@ pub struct State {
     pub trim_source: Option<TrimSource>,
     /// The `?` key-help overlay is open.
     pub help: bool,
+    /// The `^o` colour theme picker modal is open.
+    pub theme_picker: Option<crate::theme::picker::Picker>,
 }
 
 /// Outcome of a key on a list screen.
@@ -322,6 +352,7 @@ impl State {
             multi,
             trim_source: None,
             help: false,
+            theme_picker: None,
         };
         if !multi {
             s.screen = s.start_screen();
@@ -366,6 +397,21 @@ impl State {
 
     /// Apply `key`. `sessions` is the candidate list (read-only).
     pub fn handle(&mut self, key: Key, sessions: &[SessionView]) -> Step {
+        if let Some(mut picker) = self.theme_picker.take() {
+            return match picker.on_key(key.to_key_event()) {
+                crate::theme::picker::Outcome::Stay => {
+                    self.theme_picker = Some(picker);
+                    Step::Stay
+                }
+                crate::theme::picker::Outcome::Cancelled
+                | crate::theme::picker::Outcome::Selected { .. } => Step::Stay,
+                crate::theme::picker::Outcome::Quit => match self.screen {
+                    Screen::TrimConfirm(_) => Step::Run(Action::TrimConfirm(TrimChoice::Cancel)),
+                    Screen::DirConfirm(_) => Step::Run(Action::DirConfirm(DirChoice::Cancel)),
+                    _ => Step::Interrupt,
+                },
+            };
+        }
         if key == Key::Interrupt {
             return match self.screen {
                 Screen::TrimConfirm(_) => Step::Run(Action::TrimConfirm(TrimChoice::Cancel)),
@@ -375,6 +421,10 @@ impl State {
         }
         if self.help {
             self.help = false;
+            return Step::Stay;
+        }
+        if key == Key::Ctrl('o') {
+            self.theme_picker = Some(crate::theme::picker::Picker::open());
             return Step::Stay;
         }
         if key == Key::Char('?') && !self.text_entry() {
@@ -698,8 +748,31 @@ mod tests {
             Key::from(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL)),
             Key::Interrupt
         );
+        assert_eq!(
+            Key::from(KeyEvent::new(KeyCode::Char('o'), KeyModifiers::CONTROL)),
+            Key::Ctrl('o')
+        );
         assert_eq!(Key::from(KeyEvent::from(KeyCode::Delete)), Key::Backspace);
         assert_eq!(Key::from(KeyEvent::from(KeyCode::Tab)), Key::Other);
+    }
+
+    #[test]
+    fn theme_picker_in_menu() {
+        let default = crate::theme::catalog(&crate::config::Config::default())
+            .0
+            .swap_remove(0);
+        crate::theme::apply(&default);
+        let ss = one();
+        let mut s = State::new(StartScreen::Action, 1);
+        assert_eq!(s.handle(Key::Ctrl('o'), &ss), Step::Stay);
+        assert!(s.theme_picker.is_some());
+        for k in typed("nord") {
+            assert_eq!(s.handle(k, &ss), Step::Stay);
+        }
+        assert_eq!(crate::theme::current_name(), "nord");
+        assert_eq!(s.handle(Key::Esc, &ss), Step::Stay);
+        assert!(s.theme_picker.is_none());
+        assert_eq!(crate::theme::current_name(), "gruvbox-dark");
     }
 
     #[test]

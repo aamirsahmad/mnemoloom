@@ -32,9 +32,12 @@ const WORKER: &str = "mux-worker";
 /// Run the picker over `agents`; returns the pane to jump to, if any.
 /// `refresh` starts a background rescan immediately (rows came from cache).
 pub fn pick(agents: Vec<Agent>, view: &View, refresh: bool) -> Result<Option<String>> {
+    let warnings = mnemoloom::theme::init();
+    let mut app = App::new(agents);
+    app.error = warnings.into_iter().next();
     let mut terminal = ratatui::try_init()?;
     quiet_worker_panics();
-    let result = event_loop(&mut terminal, App::new(agents), view, refresh);
+    let result = event_loop(&mut terminal, app, view, refresh);
     ratatui::try_restore()?;
     result
 }

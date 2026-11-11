@@ -26,6 +26,7 @@ pub fn run(
     results_title: &str,
     scope_line: Option<&str>,
 ) -> anyhow::Result<Option<(usize, Action)>> {
+    let _ = crate::theme::init();
     let rx = spawn_details(sessions, homes);
     let mut terminal = ratatui::try_init()?;
     let result = event_loop(
@@ -43,6 +44,7 @@ pub fn run(
 /// Run a standalone dialog screen (trim-confirm / dir-confirm) and return
 /// the [`Action`] it produced.
 pub fn run_dialog(screen: Screen) -> anyhow::Result<Option<Action>> {
+    let _ = crate::theme::init();
     let (_tx, rx) = mpsc::channel();
     let mut terminal = ratatui::try_init()?;
     let result = event_loop(&mut terminal, State::dialog(screen), &mut [], rx, "", None);

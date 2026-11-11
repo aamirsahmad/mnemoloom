@@ -198,6 +198,8 @@ pub enum Mode {
         query: String,
         cursor: usize,
     },
+    /// The colour theme picker (`^o`).
+    Theme(crate::theme::picker::Picker),
 }
 
 /// Work for the event loop.
@@ -467,6 +469,21 @@ impl App {
                 super::view::ViewEffect::Close => Effect::None,
                 super::view::ViewEffect::Quit => Effect::Quit,
             },
+            Mode::Theme(mut p) => match p.on_key(k) {
+                crate::theme::picker::Outcome::Stay => {
+                    self.mode = Mode::Theme(p);
+                    Effect::None
+                }
+                crate::theme::picker::Outcome::Cancelled => Effect::None,
+                crate::theme::picker::Outcome::Selected { name, saved } => {
+                    self.status = Some(match saved {
+                        Ok(_) => format!("Theme: {name}"),
+                        Err(e) => format!("Theme: {name} ({e})"),
+                    });
+                    Effect::None
+                }
+                crate::theme::picker::Outcome::Quit => Effect::Quit,
+            },
         }
     }
 
@@ -485,6 +502,10 @@ impl App {
                 KeyCode::Char('s') => {
                     self.by_time = !self.by_time;
                     Effect::Refilter
+                }
+                KeyCode::Char('o') => {
+                    self.mode = Mode::Theme(crate::theme::picker::Picker::open());
+                    Effect::None
                 }
                 KeyCode::Char('u') => self.nav(-(PAGE as isize)),
                 _ => Effect::None,
@@ -1580,5 +1601,42 @@ mod tests {
         a.on_key(key(KeyCode::Down));
         assert_eq!(a.status, None);
         assert_eq!(a.selected, 1);
+    }
+
+    #[test]
+    fn theme_picker_modal_opens_from_normal_and_query_modes() {
+        let default = crate::theme::catalog(&crate::config::Config::default())
+            .0
+            .swap_remove(0);
+        crate::theme::apply(&default);
+        let mut a = app();
+        a.on_key(ctl('o'));
+        assert!(matches!(a.mode, Mode::Theme(_)));
+        for c in "nord".chars() {
+            a.on_key(ch(c));
+        }
+        assert_eq!(crate::theme::current_name(), "nord");
+        a.on_key(key(KeyCode::Esc));
+        assert_eq!(a.mode, Mode::Normal);
+        assert_eq!(crate::theme::current_name(), "gruvbox-dark");
+
+        // Works from Query mode too.
+        a.on_key(ch('/'));
+        assert_eq!(a.mode, Mode::Query);
+        a.on_key(ctl('o'));
+        assert!(matches!(a.mode, Mode::Theme(_)));
+        for c in "dracula".chars() {
+            a.on_key(ch(c));
+        }
+        a.on_key(key(KeyCode::Enter));
+        assert_eq!(a.mode, Mode::Normal);
+        assert_eq!(crate::theme::current_name(), "dracula");
+        assert!(
+            a.status
+                .as_deref()
+                .unwrap_or("")
+                .starts_with("Theme: dracula")
+        );
+        crate::theme::apply(&default);
     }
 }

@@ -71,6 +71,8 @@ pub struct App {
     pub wide: bool,
     /// The user's `p` choice, kept across resizes; `None` follows `wide`.
     pub preview_choice: Option<bool>,
+    /// The `^o` colour theme picker modal is open.
+    pub theme_picker: Option<mnemoloom::theme::picker::Picker>,
 }
 
 const PAGE: usize = 10;
@@ -99,6 +101,7 @@ impl App {
             help: false,
             wide: true,
             preview_choice: None,
+            theme_picker: None,
         };
         app.set_agents(agents);
         app
@@ -255,6 +258,22 @@ impl App {
     }
 
     pub fn on_key(&mut self, key: KeyEvent) -> Action {
+        if let Some(mut picker) = self.theme_picker.take() {
+            return match picker.on_key(key) {
+                mnemoloom::theme::picker::Outcome::Stay => {
+                    self.theme_picker = Some(picker);
+                    Action::None
+                }
+                mnemoloom::theme::picker::Outcome::Cancelled => Action::None,
+                mnemoloom::theme::picker::Outcome::Selected { saved, .. } => {
+                    if let Err(e) = saved {
+                        self.error = Some(e);
+                    }
+                    Action::None
+                }
+                mnemoloom::theme::picker::Outcome::Quit => Action::Quit,
+            };
+        }
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         if self.help {
             self.help = false;
@@ -265,6 +284,10 @@ impl App {
         match key.code {
             KeyCode::Char('c' | 'g' | 'q') if ctrl => Action::Quit,
             KeyCode::Char('r') if ctrl => Action::Refresh,
+            KeyCode::Char('o') if ctrl => {
+                self.theme_picker = Some(mnemoloom::theme::picker::Picker::open());
+                Action::None
+            }
             KeyCode::Enter => self
                 .selected_pane()
                 .map_or(Action::None, |p| Action::Jump(p.to_owned())),
@@ -660,5 +683,22 @@ mod tests {
         assert_eq!(q, "foo ");
         delete_word(&mut q);
         assert_eq!(q, "");
+    }
+
+    #[test]
+    fn theme_picker_in_mux() {
+        let default = mnemoloom::theme::catalog(&mnemoloom::config::Config::default())
+            .0
+            .swap_remove(0);
+        mnemoloom::theme::apply(&default);
+        let mut app = App::new(sample());
+        assert_eq!(app.on_key(ctrl('o')), Action::None);
+        assert!(app.theme_picker.is_some());
+        type_str(&mut app, "nord");
+        assert_eq!(app.query, "", "typing goes to theme picker, not mux filter");
+        assert_eq!(mnemoloom::theme::current_name(), "nord");
+        assert_eq!(app.on_key(key(KeyCode::Esc)), Action::None);
+        assert!(app.theme_picker.is_none());
+        assert_eq!(mnemoloom::theme::current_name(), "gruvbox-dark");
     }
 }

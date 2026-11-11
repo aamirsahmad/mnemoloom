@@ -19,7 +19,7 @@ use crate::session::{Agent, Homes};
     name = "mnemoloom",
     version,
     about = "Session management tools for Claude Code, Codex, pi, opencode and agy.",
-    after_help = "Environment variables:\n  CLAUDE_CONFIG_DIR    Default Claude home (overridden by --claude-home)\n  CODEX_HOME           Default Codex home (overridden by --codex-home)\n  PI_CODING_AGENT_DIR  Default pi home (overridden by --pi-home)\n  XDG_DATA_HOME        opencode data dir parent (overridden by --opencode-home)\n  AGY_HOME             Default agy home (overridden by --agy-home)"
+    after_help = "Environment variables:\n  CLAUDE_CONFIG_DIR    Default Claude home (overridden by --claude-home)\n  CODEX_HOME           Default Codex home (overridden by --codex-home)\n  PI_CODING_AGENT_DIR  Default pi home (overridden by --pi-home)\n  XDG_DATA_HOME        opencode data dir parent (overridden by --opencode-home)\n  AGY_HOME             Default agy home (overridden by --agy-home)\n  MNEMOLOOM_THEME      Override TUI colour theme (e.g. nord, one-dark, catppuccin)\n  MNEMOLOOM_CONFIG     Override config file path (default: ~/.config/mnemoloom/config.toml)"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -188,6 +188,8 @@ pub enum Command {
     /// See and jump between coding agents in tmux panes (`mnemoloom mux --help`).
     #[command(disable_help_flag = true)]
     Mux(MuxArgs),
+    /// List colour themes or set the active theme in the config file.
+    Theme(ThemeArgs),
 }
 
 /// Subcommand names (for the bare-session rewrite).
@@ -219,6 +221,7 @@ pub const SUBCOMMANDS: &[&str] = &[
     "find-derived",
     "hook",
     "mux",
+    "theme",
     "help",
 ];
 
@@ -621,6 +624,16 @@ pub struct MuxArgs {
     /// mux arguments (see `mnemoloom mux --help`)
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     pub args: Vec<OsString>,
+}
+
+/// `mnemoloom theme [NAME]`: list available themes or set the active theme in `config.toml`.
+#[derive(Args, Debug, Clone, Default)]
+pub struct ThemeArgs {
+    /// Theme name to save in config.toml (omit to list all available themes)
+    pub name: Option<String>,
+    /// Print the config file path and exit
+    #[arg(long)]
+    pub path: bool,
 }
 
 /// [`Cli::command`] with the global home flags hidden under `hook` (internal)

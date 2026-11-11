@@ -29,6 +29,7 @@ fn chip(app: &App) -> &'static str {
         Mode::Filter(_) => "FILTER",
         Mode::Actions(_) => "ACTIONS",
         Mode::Projects { .. } => "PROJECTS",
+        Mode::Theme(_) => "THEME",
         Mode::ConfirmExit | Mode::ConfirmDelete => "CONFIRM",
         Mode::View(_) => "VIEW",
     }
@@ -47,6 +48,7 @@ fn hints(app: &App) -> (Hints, Hints) {
                     ("y", "copy id"),
                     ("x", "export"),
                     ("t", "trim"),
+                    ("^o", "theme"),
                 ],
                 QUIT,
             ),
@@ -122,6 +124,10 @@ fn hints(app: &App) -> (Hints, Hints) {
             ],
             &[("esc", "close")],
         ),
+        Mode::Theme(_) => (
+            &[("type", "filter"), ("↑/↓", "move"), ("⏎", "apply")],
+            &[("esc", "cancel")],
+        ),
         Mode::ConfirmExit | Mode::ConfirmDelete => (&[("⏎/y", "yes")], &[("esc/n", "no")]),
         Mode::View(v) if v.typing => (&[("⏎", "search")], &[("esc", "cancel")]),
         Mode::View(_) => (
@@ -179,7 +185,7 @@ pub fn draw(frame: &mut Frame, app: &App, r: Rect) {
     let mut left = match (&app.status, &app.mode) {
         (Some(msg), _) => vec![vec![Span::styled(
             format!("✓ {msg}"),
-            Style::new().fg(theme::OK),
+            Style::new().fg(theme::palette().ok),
         )]],
         (None, Mode::Input(kind, buf)) => {
             vec![vec![Span::styled(prompt(*kind, buf), theme::text())]]

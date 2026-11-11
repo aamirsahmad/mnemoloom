@@ -28,6 +28,7 @@ rusqlite = { version = "0.41.1", features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order", "float_roundtrip"] }
 tantivy = "0.27.0"
+toml_edit = "0.25.19"
 unicode-segmentation = "1.13.3"
 uuid = { version = "1.29.0", features = ["v4", "v7"] }
 

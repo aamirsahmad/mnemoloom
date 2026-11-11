@@ -44,7 +44,10 @@ pub struct Ctx<'a> {
 
 pub fn draw(frame: &mut Frame, state: &State, ctx: &Ctx) {
     let area = frame.area();
-    frame.render_widget(Block::new().style(Style::new().bg(theme::BG)), area);
+    frame.render_widget(
+        Block::new().style(Style::new().bg(theme::palette().bg)),
+        area,
+    );
     let [body, footer] = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
     let session = shown_session(state, ctx);
     let main = match session {
@@ -61,6 +64,9 @@ pub fn draw(frame: &mut Frame, state: &State, ctx: &Ctx) {
     frame.render_widget(Paragraph::new(footer_line(state, footer.width)), footer);
     if state.help {
         draw_help(frame, body, state);
+    }
+    if let Some(picker) = &state.theme_picker {
+        theme::picker::draw(frame, picker, body);
     }
 }
 
@@ -87,12 +93,13 @@ fn bold(style: Style) -> Style {
 
 /// `CLD` / `CDX` / `PI ` / `OPC` / `AGY` in the agent colour.
 fn agent_badge(agent: Agent) -> Span<'static> {
+    let p = theme::palette();
     let color = match agent {
-        Agent::Claude => theme::CLAUDE,
-        Agent::Codex => theme::CODEX,
-        Agent::Pi => theme::PI,
-        Agent::OpenCode => theme::OPENCODE,
-        Agent::Agy => theme::AGY,
+        Agent::Claude => p.claude,
+        Agent::Codex => p.codex,
+        Agent::Pi => p.pi,
+        Agent::OpenCode => p.opencode,
+        Agent::Agy => p.agy,
     };
     Span::styled(agent.badge(), bold(Style::new().fg(color)))
 }

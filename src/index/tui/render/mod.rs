@@ -176,7 +176,7 @@ pub fn draw(frame: &mut Frame, app: &App, data: &Data) {
     let area = frame.area();
     frame
         .buffer_mut()
-        .set_style(area, theme::text().bg(theme::BG));
+        .set_style(area, theme::text().bg(theme::palette().bg));
     let a = areas(area, app);
     if let Mode::View(v) = &app.mode {
         preview::draw_view(frame, app, v, view_area(area));
@@ -203,7 +203,7 @@ fn pane(focused: bool) -> Block<'static> {
     Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border(focused))
-        .style(Style::new().bg(theme::BG))
+        .style(Style::new().bg(theme::palette().bg))
 }
 
 /// A horizontal rule across `width` cells.
@@ -218,7 +218,7 @@ fn fill(frame: &mut Frame, r: Rect, style: Style) {
 }
 
 fn selected_bg() -> Style {
-    Style::new().bg(theme::BG_SEL)
+    Style::new().bg(theme::palette().bg_sel)
 }
 
 /// The ACCENT `▌` marking a selected row, or a blank of the same width.
@@ -231,12 +231,13 @@ fn bar(on: bool) -> Span<'static> {
 }
 
 pub(super) fn agent_color(agent: Agent) -> ratatui::style::Color {
+    let p = theme::palette();
     match agent {
-        Agent::Claude => theme::CLAUDE,
-        Agent::Codex => theme::CODEX,
-        Agent::Pi => theme::PI,
-        Agent::OpenCode => theme::OPENCODE,
-        Agent::Agy => theme::AGY,
+        Agent::Claude => p.claude,
+        Agent::Codex => p.codex,
+        Agent::Pi => p.pi,
+        Agent::OpenCode => p.opencode,
+        Agent::Agy => p.agy,
     }
 }
 

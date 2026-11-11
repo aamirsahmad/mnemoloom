@@ -42,6 +42,7 @@ const AGENT_HINTS: &[(&str, &str)] = &[
     ("j/k", "move"),
     ("r", "refresh"),
     ("p", "preview"),
+    ("^o", "theme"),
 ];
 const FILTER_HINTS: &[(&str, &str)] = &[
     ("⏎", "attach"),
@@ -58,6 +59,7 @@ const HELP: &[(&str, &str)] = &[
     ("PgUp PgDn", "page"),
     ("r ^r", "rescan agents"),
     ("p", "toggle the preview"),
+    ("^o", "choose colour theme"),
     ("^u ^w ⌫", "clear filter / delete word / char"),
     ("", ""),
     (
@@ -82,7 +84,10 @@ const HELP: &[(&str, &str)] = &[
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
-    frame.render_widget(Block::new().style(theme::text().bg(theme::BG)), area);
+    frame.render_widget(
+        Block::new().style(theme::text().bg(theme::palette().bg)),
+        area,
+    );
     let [body, footer] = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
     app.wide = body.width >= PREVIEW_MIN_WIDTH;
     if app.show_preview() {
@@ -107,6 +112,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     draw_footer(frame, app, footer);
     if app.help {
         draw_help(frame, area);
+    }
+    if let Some(picker) = &app.theme_picker {
+        theme::picker::draw(frame, picker, area);
     }
 }
 
@@ -145,7 +153,7 @@ fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
     if let Some(error) = &app.error {
         right.push(Span::styled(
             format!("{error}  "),
-            theme::text().fg(theme::WARN),
+            theme::text().fg(theme::palette().warn),
         ));
     }
     if app.scanning {
@@ -171,7 +179,7 @@ fn draw_filter(frame: &mut Frame, app: &App, area: Rect) {
     let cursor = input.x + (2 + width(&app.query)) as u16;
     frame.render_widget(Paragraph::new(Line::from(vec![slash, query])), input);
     frame.render_widget(Paragraph::new(right).right_aligned(), status);
-    if filtering && !app.help {
+    if filtering && !app.help && app.theme_picker.is_none() {
         frame.set_cursor_position((cursor.min(input.right().saturating_sub(1)), input.y));
     }
 }
@@ -219,7 +227,7 @@ fn draw_list(frame: &mut Frame, app: &mut App, area: Rect) {
             // An item style goes under the spans, so highlighted terms keep
             // their background on the selected row.
             if selected == Some(n) {
-                item.style(Style::new().bg(theme::BG_SEL))
+                item.style(Style::new().bg(theme::palette().bg_sel))
             } else {
                 item
             }
@@ -276,7 +284,7 @@ fn snippet_line(snippet: &Snippet, cells: usize) -> Line<'static> {
     } else {
         2
     };
-    let soft = Style::new().fg(theme::FG_SOFT);
+    let soft = Style::new().fg(theme::palette().fg_soft);
     let mut spans = vec![Span::raw(" ".repeat(indent)), Span::styled("…", soft)];
     let room = cells.saturating_sub(indent + 1);
     if room > 0 {
@@ -330,22 +338,24 @@ fn age(agent: &Agent) -> String {
 }
 
 fn badge(kind: Kind) -> Span<'static> {
+    let p = theme::palette();
     let (label, colour) = match kind {
-        Kind::Claude => ("CLD", theme::CLAUDE),
-        Kind::Codex => ("CDX", theme::CODEX),
-        Kind::Pi => ("PI ", theme::PI),
-        Kind::OpenCode => ("OPC", theme::OPENCODE),
-        Kind::Agy => ("AGY", theme::AGY),
+        Kind::Claude => ("CLD", p.claude),
+        Kind::Codex => ("CDX", p.codex),
+        Kind::Pi => ("PI ", p.pi),
+        Kind::OpenCode => ("OPC", p.opencode),
+        Kind::Agy => ("AGY", p.agy),
     };
     Span::styled(label, Style::new().fg(colour).bold())
 }
 
 fn state_style(state: State) -> Style {
+    let p = theme::palette();
     match state {
-        State::Input => Style::new().fg(theme::WARN),
-        State::Busy => Style::new().fg(theme::ACCENT),
+        State::Input => Style::new().fg(p.warn),
+        State::Busy => Style::new().fg(p.accent),
         // Not LINK: that equals CODEX, so `● bg CDX` would read as one block.
-        State::Bg => Style::new().fg(theme::OK),
+        State::Bg => Style::new().fg(p.ok),
         State::Idle => theme::dim(),
     }
 }
@@ -420,7 +430,7 @@ fn preview_header(agent: &Agent) -> Vec<Line<'static>> {
         let short: String = agent.session_id.chars().take(8).collect();
         lines.push(Line::styled(
             format!("session {short}"),
-            Style::new().fg(theme::LINK),
+            Style::new().fg(theme::palette().link),
         ));
     }
     lines
@@ -445,10 +455,18 @@ fn tilde(path: &str) -> String {
 }
 
 fn draw_footer(frame: &mut Frame, app: &App, area: Rect) {
-    let (chip, hints, right): (&str, _, &[(&str, &str)]) = match app.mode {
-        Mode::Agents => (" AGENTS ", AGENT_HINTS, &[("?", "help"), ("q", "quit")]),
-        Mode::Filter if app.query.is_empty() => (" FILTER ", FILTER_HINTS, &[("esc", "quit")]),
-        Mode::Filter => (" FILTER ", FILTER_HINTS, &[("esc", "agents")]),
+    let (chip, hints, right): (&str, _, &[(&str, &str)]) = if app.theme_picker.is_some() {
+        (
+            " THEME ",
+            &[("type", "filter"), ("↑/↓", "move"), ("⏎", "apply")][..],
+            &[("esc", "cancel")],
+        )
+    } else {
+        match app.mode {
+            Mode::Agents => (" AGENTS ", AGENT_HINTS, &[("?", "help"), ("q", "quit")]),
+            Mode::Filter if app.query.is_empty() => (" FILTER ", FILTER_HINTS, &[("esc", "quit")]),
+            Mode::Filter => (" FILTER ", FILTER_HINTS, &[("esc", "agents")]),
+        }
     };
     let right = Line::from(hint_spans(right));
     // Drop trailing hints rather than cutting one in half.
@@ -504,7 +522,7 @@ fn draw_help(frame: &mut Frame, area: Rect) {
         w,
         h,
     );
-    let block = pane("KEYS", true).style(theme::text().bg(theme::BG));
+    let block = pane("KEYS", true).style(theme::text().bg(theme::palette().bg));
     frame.render_widget(Clear, popup);
     frame.render_widget(
         Paragraph::new(lines).block(block.padding(Padding::horizontal(1))),
@@ -690,9 +708,10 @@ mod tests {
         let screen = render(&mut app, 140, 36);
         assert!(screen.contains("● busy   PI  pi task"));
         assert!(screen.contains("● idle   OPC opencode task"));
-        assert_eq!(badge(Kind::Pi).style.fg, Some(theme::PI));
-        assert_eq!(badge(Kind::OpenCode).style.fg, Some(theme::OPENCODE));
-        assert_eq!(badge(Kind::Agy).style.fg, Some(theme::AGY));
+        let pal = theme::palette();
+        assert_eq!(badge(Kind::Pi).style.fg, Some(pal.pi));
+        assert_eq!(badge(Kind::OpenCode).style.fg, Some(pal.opencode));
+        assert_eq!(badge(Kind::Agy).style.fg, Some(pal.agy));
         for kind in [
             Kind::Claude,
             Kind::Codex,
@@ -764,12 +783,13 @@ mod tests {
         let x = col(&rows[row + 1], "rocket");
         assert_eq!(buffer[(x, row as u16 + 1)].style().bg, theme::hit().bg);
         // The rest of the selected card keeps the selection background.
+        let pal = theme::palette();
         let before = buffer[(x - 2, row as u16 + 1)].style();
         assert_eq!(
             (before.fg, before.bg),
-            (Some(theme::FG_SOFT), Some(theme::BG_SEL))
+            (Some(pal.fg_soft), Some(pal.bg_sel))
         );
-        assert_eq!(buffer[(x - 2, row as u16 + 1)].fg, theme::FG_SOFT);
+        assert_eq!(buffer[(x - 2, row as u16 + 1)].fg, pal.fg_soft);
     }
 
     #[test]
@@ -795,6 +815,6 @@ mod tests {
 
     #[test]
     fn bg_state_and_codex_badge_differ() {
-        assert_ne!(state_style(State::Bg).fg, Some(theme::CODEX));
+        assert_ne!(state_style(State::Bg).fg, Some(theme::palette().codex));
     }
 }

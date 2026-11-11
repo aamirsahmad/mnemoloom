@@ -81,9 +81,10 @@ impl Builder<'_> {
     fn check(&mut self, facet: &Facet, label: &str, count: Option<usize>) {
         let cursor = self.next_item();
         let state = facets::state(&self.app.filters, &self.app.projects, facet, self.today);
+        let ok = theme::palette().ok;
         let (mark, mark_st, label_st) = match state {
-            Check::On => ("[x]", Style::new().fg(theme::OK), theme::text()),
-            Check::Partial => ("[-]", Style::new().fg(theme::OK), theme::text()),
+            Check::On => ("[x]", Style::new().fg(ok), theme::text()),
+            Check::Partial => ("[-]", Style::new().fg(ok), theme::text()),
             Check::Off => ("[ ]", theme::dim(), theme::dim()),
         };
         let count = count.map(|n| n.to_string()).unwrap_or_default();
@@ -102,6 +103,7 @@ impl Builder<'_> {
 
     fn radios(&mut self, pair: [When; 2]) {
         let current = When::of(self.app.filters.after, self.app.filters.before, self.today);
+        let ok = theme::palette().ok;
         let mut spans = Vec::new();
         let mut any = false;
         for w in pair {
@@ -112,7 +114,7 @@ impl Builder<'_> {
             if current == Some(w) {
                 spans.extend([
                     Span::styled("(", theme::text().patch(cell)),
-                    Span::styled("•", Style::new().fg(theme::OK).patch(cell)),
+                    Span::styled("•", Style::new().fg(ok).patch(cell)),
                     Span::styled(")", theme::text().patch(cell)),
                     Span::styled(label.clone(), theme::text().patch(cell)),
                 ]);

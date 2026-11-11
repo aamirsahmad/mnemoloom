@@ -129,5 +129,6 @@ fn dispatch(cli: &Cli) -> anyhow::Result<ExitCode> {
         Command::FindDerived(a) => commands::lineage::find_derived(g, a),
         Command::Hook(HookCommand::Resume(a)) => hook::resume(g, a),
         Command::Mux(a) => Ok(mux::main(a.args.clone())),
+        Command::Theme(a) => commands::theme::run(a),
     }
 }

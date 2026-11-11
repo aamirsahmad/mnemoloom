@@ -172,15 +172,16 @@ fn card_lines(app: &App, data: &Data, r: &Row, sel: bool, width: usize) -> Vec<L
         Span::raw(" ".repeat(CARD_INDENT - 1)),
         Span::styled(place, theme::dim()),
     ];
+    let pal = theme::palette();
     if live {
         second.extend([
             Span::styled(" · ", theme::dim()),
-            Span::styled("●", Style::new().fg(theme::OK)),
+            Span::styled("●", Style::new().fg(pal.ok)),
             Span::styled(" live", theme::dim()),
         ]);
     }
     // 3: …snippet with the matched terms highlighted.
-    let soft = Style::new().fg(theme::FG_SOFT);
+    let soft = Style::new().fg(pal.fg_soft);
     let mut third = vec![bar(sel), Span::raw(" ".repeat(CARD_INDENT - 1))];
     third.push(Span::styled("…", soft));
     let max = room.saturating_sub(1);
