@@ -14,7 +14,7 @@ use crate::index::extract::tool_use_text;
 use crate::index::query::Row;
 use crate::index::snippet::{find_ci, keyword_ranges};
 use crate::session::lineage::{full_chain, parent_info};
-use crate::session::message::{self, Message, MessageKind, Role};
+use crate::session::message::{self, Message, MessageKind, Role, display_title};
 use crate::session::{Agent, Derivation, Transcript, path_session_uuid};
 
 /// Who a logical line belongs to.
@@ -119,6 +119,147 @@ pub fn load_text(path: &Path, agent: Agent) -> anyhow::Result<Vec<String>> {
     }
 }
 
+/// Preview content with extracted prompt.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PreviewData {
+    pub lines: Vec<String>,
+    pub prompt: String,
+}
+
+const MAX_PREVIEW_LINES_PER_MSG: usize = 8;
+
+/// Load a session as preview text (first msg, ..., last 2-3 msgs) with extracted prompt.
+pub fn load_preview_data(path: &Path, agent: Agent) -> anyhow::Result<PreviewData> {
+    if agent == Agent::OpenCode || path.extension().is_some_and(|e| e == "jsonl") {
+        let msgs = Transcript::load(path, agent)?.display_messages();
+        let prompt = msgs
+            .iter()
+            .find(|m| m.role == Role::User && !m.is_meta && !m.text.trim().is_empty())
+            .map(|m| display_title(&m.text))
+            .unwrap_or_default();
+        let lines = preview_message_lines(msgs);
+        Ok(PreviewData { lines, prompt })
+    } else {
+        let text = std::fs::read_to_string(path)?;
+        let raw_lines: Vec<String> = text.lines().map(str::to_string).collect();
+        let prompt = raw_lines
+            .iter()
+            .find(|l| !l.trim().is_empty())
+            .map(|l| display_title(l))
+            .unwrap_or_default();
+        let lines = abbreviate_raw_lines(raw_lines);
+        Ok(PreviewData { lines, prompt })
+    }
+}
+
+/// Load a session as preview text: first message (prompt), ellipsis, and last 2-3 messages.
+pub fn load_preview_text(path: &Path, agent: Agent) -> anyhow::Result<Vec<String>> {
+    Ok(load_preview_data(path, agent)?.lines)
+}
+
+fn abbreviate_raw_lines(lines: Vec<String>) -> Vec<String> {
+    if lines.len() <= 20 {
+        return lines;
+    }
+    let mut out = Vec::new();
+    out.extend(lines[..8].iter().cloned());
+    out.push(String::new());
+    out.push("...".to_string());
+    out.push(String::new());
+    out.extend(lines[lines.len() - 12..].iter().cloned());
+    out
+}
+
+/// Preview lines: initial user prompt, `...`, and last 2-3 messages.
+pub fn preview_message_lines(msgs: impl IntoIterator<Item = Message>) -> Vec<String> {
+    let relevant: Vec<Message> = msgs
+        .into_iter()
+        .filter(|m| {
+            (m.role == Role::User || m.role == Role::Assistant)
+                && !m.is_meta
+                && match m.kind {
+                    MessageKind::Text => !m.text.trim().is_empty(),
+                    MessageKind::ToolUse => !tool_use_text(m).trim().is_empty(),
+                    _ => false,
+                }
+        })
+        .collect();
+
+    if relevant.is_empty() {
+        return Vec::new();
+    }
+
+    if relevant.len() <= 4 {
+        let mut out = Vec::new();
+        for m in &relevant {
+            let formatted = format_single_message(m, MAX_PREVIEW_LINES_PER_MSG);
+            if formatted.is_empty() {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push(String::new());
+            }
+            out.extend(formatted);
+        }
+        return out;
+    }
+
+    let mut out = Vec::new();
+    let first = format_single_message(&relevant[0], MAX_PREVIEW_LINES_PER_MSG);
+    out.extend(first);
+
+    out.push(String::new());
+    out.push("...".to_string());
+    out.push(String::new());
+
+    let tail_start = relevant.len().saturating_sub(3);
+    for (i, m) in relevant[tail_start..].iter().enumerate() {
+        let formatted = format_single_message(m, MAX_PREVIEW_LINES_PER_MSG);
+        if formatted.is_empty() {
+            continue;
+        }
+        if i > 0 {
+            out.push(String::new());
+        }
+        out.extend(formatted);
+    }
+
+    out
+}
+
+fn format_single_message(m: &Message, max_lines: usize) -> Vec<String> {
+    let prefix = match m.role {
+        Role::User => "> ",
+        Role::Assistant => "⏺ ",
+        _ => return Vec::new(),
+    };
+    let text = match m.kind {
+        _ if m.is_meta => return Vec::new(),
+        MessageKind::Text => m.text.clone(),
+        MessageKind::ToolUse => tool_use_text(m),
+        _ => return Vec::new(),
+    };
+    let text = text.trim();
+    if text.is_empty() {
+        return Vec::new();
+    }
+    let all_lines: Vec<&str> = text.lines().collect();
+    let mut out = Vec::new();
+    let capped = all_lines.len() > max_lines;
+    let take = if capped { max_lines } else { all_lines.len() };
+    for (j, line) in all_lines.iter().take(take).enumerate() {
+        out.push(match j {
+            0 => format!("{prefix}{line}"),
+            _ if line.is_empty() => String::new(),
+            _ => format!("  {line}"),
+        });
+    }
+    if capped {
+        out.push("  ...".to_string());
+    }
+    out
+}
+
 /// `> user text` / `⏺ assistant text` blocks; continuation lines indented
 /// two spaces; a blank line between messages. Tool calls appear as
 /// `[Tool: name]` plus their string inputs; tool output, thinking and
@@ -168,7 +309,7 @@ fn message_lines(msgs: impl IntoIterator<Item = Message>) -> Vec<String> {
 }
 
 /// Classify prefixed text lines (`> `, `⏺ `, continuation, blank).
-fn parse_lines(text: Vec<String>) -> Vec<VLine> {
+pub fn parse_lines(text: Vec<String>) -> Vec<VLine> {
     let mut ctx = Kind::Plain;
     text.into_iter()
         .map(|l| {
@@ -200,6 +341,13 @@ fn parse_lines(text: Vec<String>) -> Vec<VLine> {
                     first: false,
                     text: String::new(),
                 }
+            } else if l == "..." || l == "···" {
+                ctx = Kind::Plain;
+                VLine {
+                    kind: Kind::Plain,
+                    first: false,
+                    text: clean(&l),
+                }
             } else {
                 let body = if ctx == Kind::Plain {
                     &l[..]
@@ -214,6 +362,40 @@ fn parse_lines(text: Vec<String>) -> Vec<VLine> {
             }
         })
         .collect()
+}
+
+/// Render parsed lines as formatted Ratatui `Line`s with gutters, role labels, and agent colors.
+pub fn render_preview_lines(lines: &[VLine], agent: Agent) -> Vec<ratatui::text::Line<'static>> {
+    let mut out = Vec::new();
+    for line in lines {
+        let (role_style, base_style) = match line.kind {
+            Kind::User => (
+                ratatui::style::Style::new().fg(crate::theme::palette().ok),
+                crate::theme::text(),
+            ),
+            Kind::Assistant => (
+                ratatui::style::Style::new().fg(crate::index::tui::render::agent_color(agent)),
+                crate::theme::text(),
+            ),
+            Kind::Tool => (crate::theme::dim(), crate::theme::dim()),
+            Kind::Plain => (crate::theme::dim(), crate::theme::dim()),
+        };
+        let mut spans = Vec::new();
+        if line.kind != Kind::Plain || line.text == "..." || line.text == "···" {
+            let gutter = if line.first {
+                format!("{:>w$} ", label(line.kind, agent), w = GUTTER - 1)
+            } else {
+                " ".repeat(GUTTER)
+            };
+            spans.push(ratatui::text::Span::styled(
+                gutter,
+                role_style.add_modifier(ratatui::style::Modifier::BOLD),
+            ));
+        }
+        spans.push(ratatui::text::Span::styled(line.text.clone(), base_style));
+        out.push(ratatui::text::Line::from(spans));
+    }
+    out
 }
 
 fn occurrences(lines: &[VLine], find: impl Fn(&str) -> Vec<Range<usize>>) -> Vec<(usize, usize)> {
@@ -458,7 +640,18 @@ impl Preview {
     /// the `parent_id` of an opencode subtask).
     pub fn load(row: Row, keywords: Vec<String>) -> anyhow::Result<Preview> {
         let path = Path::new(&row.file_path);
-        let lines = load_text(path, row.agent)?;
+        let preview_lines = load_preview_text(path, row.agent)?;
+        let lines = if keywords.is_empty() {
+            preview_lines
+        } else {
+            let vlines = parse_lines(preview_lines.clone());
+            let hits = occurrences(&vlines, |t| keyword_ranges(t, &keywords));
+            if !hits.is_empty() {
+                preview_lines
+            } else {
+                load_text(path, row.agent)?
+            }
+        };
         let parent = if matches!(row.agent, Agent::OpenCode | Agent::Agy) {
             let chain = if row.is_sidechain {
                 full_chain(path)
@@ -695,5 +888,67 @@ mod tests {
         assert!(!text.iter().any(|l| l.contains("Called the Read tool")));
         // The 6-cell gutter fits the opencode label.
         assert!(label(Kind::Assistant, Agent::OpenCode).len() < GUTTER);
+    }
+
+    #[test]
+    fn preview_message_lines_short_conversation() {
+        let msgs = vec![
+            Message::new(0, 0, Role::User, MessageKind::Text, "first prompt".into()),
+            Message::new(1, 0, Role::Assistant, MessageKind::Text, "reply 1".into()),
+            Message::new(2, 0, Role::User, MessageKind::Text, "second prompt".into()),
+        ];
+        let lines = preview_message_lines(msgs);
+        assert_eq!(
+            lines,
+            ["> first prompt", "", "⏺ reply 1", "", "> second prompt"]
+        );
+    }
+
+    #[test]
+    fn preview_message_lines_long_conversation_shows_prompt_ellipsis_tail() {
+        let msgs: Vec<Message> = (0..8)
+            .map(|i| {
+                let (role, prefix) = if i % 2 == 0 {
+                    (Role::User, "user")
+                } else {
+                    (Role::Assistant, "agent")
+                };
+                Message::new(i, 0, role, MessageKind::Text, format!("{prefix} msg {i}"))
+            })
+            .collect();
+        let lines = preview_message_lines(msgs);
+        assert_eq!(lines[0], "> user msg 0");
+        assert_eq!(lines[1], "");
+        assert_eq!(lines[2], "...");
+        assert_eq!(lines[3], "");
+        // Tail is the last 3 messages: indices 5 (agent), 6 (user), 7 (agent)
+        assert_eq!(lines[4], "⏺ agent msg 5");
+        assert_eq!(lines[5], "");
+        assert_eq!(lines[6], "> user msg 6");
+        assert_eq!(lines[7], "");
+        assert_eq!(lines[8], "⏺ agent msg 7");
+
+        let vlines = parse_lines(lines);
+        assert_eq!(vlines[0].kind, Kind::User);
+        assert_eq!(vlines[2].kind, Kind::Plain);
+        assert_eq!(vlines[2].text, "...");
+        assert_eq!(vlines[4].kind, Kind::Assistant);
+
+        let rendered = render_preview_lines(&vlines, Agent::Claude);
+        assert_eq!(rendered.len(), 9);
+    }
+
+    #[test]
+    fn preview_message_lines_caps_long_message() {
+        let long_text = (0..20)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let msgs = vec![Message::new(0, 0, Role::User, MessageKind::Text, long_text)];
+        let lines = preview_message_lines(msgs);
+        assert_eq!(lines.len(), 9);
+        assert_eq!(lines[0], "> line 0");
+        assert_eq!(lines[7], "  line 7");
+        assert_eq!(lines[8], "  ...");
     }
 }

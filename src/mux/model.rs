@@ -26,6 +26,18 @@ impl Kind {
     }
 }
 
+impl From<Kind> for mnemoloom::session::Agent {
+    fn from(kind: Kind) -> Self {
+        match kind {
+            Kind::Claude => mnemoloom::session::Agent::Claude,
+            Kind::Codex => mnemoloom::session::Agent::Codex,
+            Kind::Pi => mnemoloom::session::Agent::Pi,
+            Kind::OpenCode => mnemoloom::session::Agent::OpenCode,
+            Kind::Agy => mnemoloom::session::Agent::Agy,
+        }
+    }
+}
+
 /// What the agent is doing right now, most urgent first.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -122,6 +134,8 @@ pub struct Agent {
     #[serde(default)]
     pub session_id: String,
     #[serde(default)]
+    pub first_msg: String,
+    #[serde(default)]
     pub last_input_at: Option<f64>,
     #[serde(default = "unknown")]
     pub input_source: String,
@@ -161,6 +175,7 @@ impl Agent {
             info: String::new(),
             pid: 0,
             session_id: String::new(),
+            first_msg: String::new(),
             last_input_at: None,
             input_source: unknown(),
             input_scope: unknown(),

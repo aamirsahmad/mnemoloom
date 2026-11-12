@@ -42,6 +42,7 @@ const AGENT_HINTS: &[(&str, &str)] = &[
     ("j/k", "move"),
     ("r", "refresh"),
     ("p", "preview"),
+    ("t", "view"),
     ("^o", "theme"),
 ];
 const FILTER_HINTS: &[(&str, &str)] = &[
@@ -58,6 +59,7 @@ const HELP: &[(&str, &str)] = &[
     ("g G", "first / last agent"),
     ("PgUp PgDn", "page"),
     ("r ^r", "rescan agents"),
+    ("t", "toggle conversation / terminal preview"),
     ("p", "toggle the preview"),
     ("^o", "choose colour theme"),
     ("^u ^w ⌫", "clear filter / delete word / char"),
@@ -254,10 +256,12 @@ fn row_line(agent: &Agent, cells: usize) -> Line<'static> {
         0
     };
     let name_width = flexible.saturating_sub(if repo_width > 0 { repo_width + 2 } else { 0 });
-    let name = if agent.name.is_empty() {
-        "-"
-    } else {
+    let name = if !agent.name.is_empty() && agent.name != "-" {
         &agent.name
+    } else if !agent.first_msg.is_empty() {
+        &agent.first_msg
+    } else {
+        "-"
     };
     let mut spans = vec![
         Span::styled("● ", style),
@@ -380,35 +384,49 @@ fn draw_preview(frame: &mut Frame, app: &App, area: Rect) {
     .areas(inner);
     frame.render_widget(Paragraph::new(header), head);
     frame.render_widget(rule(sep), sep);
+    let box_title = if app.preview_is_terminal {
+        " TERMINAL "
+    } else {
+        " CONVERSATION "
+    };
     let boxed = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme::border(false))
+        .title(Span::styled(box_title, theme::dim().bold()))
         .padding(Padding::horizontal(1));
     let body = boxed.inner(capture);
     frame.render_widget(boxed, capture);
     if app.preview_pane != agent.pane {
-        frame.render_widget(Paragraph::new("capturing…").style(theme::dim()), body);
+        frame.render_widget(Paragraph::new("loading…").style(theme::dim()), body);
         return;
     }
-    // Keep the bottom, as the pane shows it: blank rows under the cursor are
-    // dropped and lines are clipped at the box edge, never wrapped.
-    let filled = app
-        .preview
-        .iter()
-        .rposition(|line| line.spans.iter().any(|s| !s.content.trim().is_empty()))
-        .map_or(0, |last| last + 1);
-    let rows = &app.preview[..filled];
-    let visible = rows[rows.len().saturating_sub(body.height as usize)..].to_vec();
-    frame.render_widget(Paragraph::new(visible), body);
+    if app.preview_is_terminal {
+        // Keep the bottom, as the pane shows it: blank rows under the cursor are
+        // dropped and lines are clipped at the box edge, never wrapped.
+        let filled = app
+            .preview
+            .iter()
+            .rposition(|line| line.spans.iter().any(|s| !s.content.trim().is_empty()))
+            .map_or(0, |last| last + 1);
+        let rows = &app.preview[..filled];
+        let visible = rows[rows.len().saturating_sub(body.height as usize)..].to_vec();
+        frame.render_widget(Paragraph::new(visible), body);
+    } else {
+        // Conversation preview: top-anchored (prompt -> ... -> last messages)
+        let visible = app.preview[..app.preview.len().min(body.height as usize)].to_vec();
+        frame.render_widget(Paragraph::new(visible), body);
+    }
 }
 
 /// Title; `pane · kind · model · activity age`; `cwd @ branch`; session id.
 /// Parts the scan did not find are left out.
 fn preview_header(agent: &Agent) -> Vec<Line<'static>> {
-    let title = if agent.name.is_empty() {
-        &agent.pane
-    } else {
+    let title = if !agent.name.is_empty() && agent.name != "-" {
         &agent.name
+    } else if !agent.first_msg.is_empty() {
+        &agent.first_msg
+    } else {
+        &agent.pane
     };
     let activity = format!("{} {}", agent.inactivity.as_str(), age(agent));
     let about = [
@@ -697,6 +715,31 @@ mod tests {
             .find(|&p| buffer[p].symbol() == "日")
             .map(|p| buffer[p].fg);
         assert_eq!(red, Some(Color::Indexed(1)));
+    }
+
+    #[test]
+    fn conversation_preview_is_top_anchored() {
+        let mut app = app();
+        app.preview_is_terminal = false;
+        app.preview_pane = "a:1.1".into();
+        app.preview = (0..50)
+            .map(|i| Line::raw(format!("msg line {i}")))
+            .collect();
+        let (rows, _) = preview_rows(&mut app);
+        assert_eq!(rows[0], "msg line 0");
+        assert_eq!(
+            rows.last().unwrap(),
+            &format!("msg line {}", rows.len() - 1)
+        );
+    }
+
+    #[test]
+    fn agent_with_first_msg_shows_in_row_and_preview_header() {
+        let mut a = Agent::new("p:1.1".into(), "s".into(), Kind::Claude);
+        a.first_msg = "tell me about mnemoloom".into();
+        let mut app = App::new(vec![a]);
+        let screen = render(&mut app, 140, 36);
+        assert!(screen.contains("tell me about mnemoloom"));
     }
 
     #[test]

@@ -19,8 +19,28 @@ use crossterm::event::{self, Event, KeyEventKind};
 
 use self::app::{Action, App};
 use super::filters::{View, display};
-use super::model::Agent;
+use super::model::{Agent, Kind};
 use super::{now, tmux};
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PreviewTarget {
+    pub pane: String,
+    pub session_id: String,
+    pub kind: Kind,
+    pub terminal_only: bool,
+}
+
+pub enum PreviewResult {
+    Terminal {
+        pane: String,
+        text: String,
+    },
+    Conversation {
+        pane: String,
+        lines: Vec<ratatui::text::Line<'static>>,
+        prompt: String,
+    },
+}
 
 /// How often the preview pane is recaptured.
 const PREVIEW_INTERVAL: Duration = Duration::from_millis(500);
@@ -60,12 +80,18 @@ fn event_loop(
         .map(|(dir, homes)| search::Searcher::spawn(dir, homes));
     let updated = index.map(|(dir, homes)| search::spawn_update(dir, homes));
     app.indexing = updated.is_some();
-    let mut target: Option<String> = None;
+    let mut current_target: Option<PreviewTarget> = None;
     loop {
-        if app.selected_pane() != target.as_deref() {
-            target = app.selected_pane().map(str::to_owned);
-            if let Some(pane) = &target {
-                preview.watch(pane.clone());
+        let desired_target = app.selected().map(|a| PreviewTarget {
+            pane: a.pane.clone(),
+            session_id: a.session_id.clone(),
+            kind: a.kind,
+            terminal_only: app.preview_terminal,
+        });
+        if desired_target != current_target {
+            current_target = desired_target.clone();
+            if let Some(target) = desired_target {
+                preview.watch(target);
             }
         }
         terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -90,8 +116,8 @@ fn event_loop(
                 Err(err) => app.error = Some(format!("scan failed: {err}")),
             }
         }
-        while let Ok((pane, text)) = preview.results.try_recv() {
-            app.set_preview(pane, &text);
+        while let Ok(res) = preview.results.try_recv() {
+            app.set_preview_result(res);
         }
         let Some(searcher) = &searcher else {
             continue;
@@ -165,26 +191,25 @@ fn spawn_scan(tx: Sender<Result<Vec<Agent>, String>>) {
 /// Recaptures the watched pane every `PREVIEW_INTERVAL`, and at once when the
 /// watched pane changes. Stops when the picker drops it.
 struct PreviewWorker {
-    watch: Sender<String>,
-    results: Receiver<(String, String)>,
+    watch: Sender<PreviewTarget>,
+    results: Receiver<PreviewResult>,
 }
 
 impl PreviewWorker {
     fn spawn() -> Self {
-        let (watch, targets) = mpsc::channel::<String>();
+        let (watch, targets) = mpsc::channel::<PreviewTarget>();
         let (out, results) = mpsc::channel();
         spawn_worker("preview", move || {
-            let mut pane: Option<String> = None;
+            let mut target: Option<PreviewTarget> = None;
             loop {
                 match targets.recv_timeout(PREVIEW_INTERVAL) {
-                    Ok(next) => pane = Some(targets.try_iter().last().unwrap_or(next)),
+                    Ok(next) => target = Some(targets.try_iter().last().unwrap_or(next)),
                     Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => return,
                 }
-                if let Some(p) = &pane {
-                    let text = guarded(|| tmux::preview(p))
-                        .unwrap_or_else(|err| format!("preview failed: {err}"));
-                    if out.send((p.clone(), text)).is_err() {
+                if let Some(t) = &target {
+                    let result = fetch_preview(t);
+                    if out.send(result).is_err() {
                         return;
                     }
                 }
@@ -193,8 +218,36 @@ impl PreviewWorker {
         PreviewWorker { watch, results }
     }
 
-    fn watch(&self, pane: String) {
-        let _ = self.watch.send(pane);
+    fn watch(&self, target: PreviewTarget) {
+        let _ = self.watch.send(target);
+    }
+}
+
+fn fetch_preview(target: &PreviewTarget) -> PreviewResult {
+    if !target.terminal_only
+        && !target.session_id.is_empty()
+        && let Ok(homes) = mnemoloom::session::Homes::resolve_all(None, None, None, None, None)
+        && let Ok(res) = mnemoloom::session::resolve::resolve_query(
+            &target.session_id,
+            Some(target.kind.into()),
+            &homes,
+        )
+        && let Ok(data) =
+            mnemoloom::index::tui::view::load_preview_data(&res.session_file, target.kind.into())
+    {
+        let vlines = mnemoloom::index::tui::view::parse_lines(data.lines);
+        let lines = mnemoloom::index::tui::view::render_preview_lines(&vlines, target.kind.into());
+        return PreviewResult::Conversation {
+            pane: target.pane.clone(),
+            lines,
+            prompt: data.prompt,
+        };
+    }
+    let text = guarded(|| tmux::preview(&target.pane))
+        .unwrap_or_else(|err| format!("preview failed: {err}"));
+    PreviewResult::Terminal {
+        pane: target.pane.clone(),
+        text,
     }
 }
 

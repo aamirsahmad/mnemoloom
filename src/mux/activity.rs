@@ -39,8 +39,8 @@ static AGY_OPEN: LazyLock<Regex> = LazyLock::new(|| {
         .expect("static regex")
 });
 
-/// Last-input timestamps per session id, and how much of history was read.
-type History = (HashMap<String, f64>, &'static str);
+/// Last-input timestamps per session id, first prompt per session, and how much of history was read.
+type History = (HashMap<String, f64>, HashMap<String, String>, &'static str);
 
 /// Open rollout paths per Codex pid; `None` when the probe failed.
 pub type OpenRollouts = Option<HashMap<u32, Vec<PathBuf>>>;
@@ -127,10 +127,18 @@ pub fn enrich(agents: &mut [Agent], procs: &Snapshot, open: &OpenRollouts, now: 
             None => {}
         }
         agent.input_scope = "session".into();
-        let (times, status) = histories
+        let (times, first_prompts, status) = histories
             .entry((home.clone(), agent.kind))
             .or_insert_with(|| read_history(home, agent.kind, now));
         agent.last_input_at = times.get(sid).copied();
+        if agent.first_msg.is_empty()
+            && let Some(prompt) = first_prompts.get(sid)
+        {
+            agent.first_msg = prompt.clone();
+        }
+        if (agent.name.is_empty() || agent.name == "-") && !agent.first_msg.is_empty() {
+            agent.name = mnemoloom::session::message::display_title(&agent.first_msg);
+        }
         agent.input_source = format!("{}/history-{status}", identity.method);
         agent.extra.activity_home = Some(home.to_string_lossy().into_owned());
         let evidence = if times.contains_key(sid) {
@@ -270,29 +278,37 @@ fn read_history(home: &Path, kind: Kind, now: f64) -> History {
             } else {
                 0
             };
+            let (times, first_prompts) = parse_history(&data[cut..], kind, now);
             (
-                parse_history(&data[cut..], kind, now),
+                times,
+                first_prompts,
                 if truncated { "tail" } else { "complete" },
             )
         }
-        Err(_) => (HashMap::new(), "unavailable"),
+        Err(_) => (HashMap::new(), HashMap::new(), "unavailable"),
     }
 }
 
-fn parse_history(data: &[u8], kind: Kind, now: f64) -> HashMap<String, f64> {
+fn parse_history(
+    data: &[u8],
+    kind: Kind,
+    now: f64,
+) -> (HashMap<String, f64>, HashMap<String, String>) {
     let (text_key, sid_key, ts_key, scale) = match kind {
         Kind::Claude => ("display", "sessionId", "timestamp", 1000.0),
         Kind::Codex => ("text", "session_id", "ts", 1.0),
         Kind::Agy => ("display", "conversationId", "timestamp", 1000.0),
         // Never identified (no homes), so never asked for history.
-        Kind::Pi | Kind::OpenCode => return HashMap::new(),
+        Kind::Pi | Kind::OpenCode => return (HashMap::new(), HashMap::new()),
     };
     let mut times: HashMap<String, f64> = HashMap::new();
+    let mut prompts: HashMap<String, String> = HashMap::new();
     for line in data.split(|&b| b == b'\n') {
         let Ok(Value::Object(record)) = serde_json::from_slice::<Value>(line) else {
             continue;
         };
-        if let Some(Value::String(text)) = record.get(text_key)
+        let prompt_text = record.get(text_key).and_then(Value::as_str);
+        if let Some(text) = prompt_text
             && SYNTHETIC.iter().any(|p| text.trim_start().starts_with(p))
         {
             continue;
@@ -311,8 +327,13 @@ fn parse_history(data: &[u8], kind: Kind, now: f64) -> HashMap<String, f64> {
         }
         let entry = times.entry(sid.clone()).or_insert(value);
         *entry = entry.max(value);
+        if let Some(text) = prompt_text.filter(|t| !t.trim().is_empty()) {
+            prompts
+                .entry(sid.clone())
+                .or_insert_with(|| text.to_string());
+        }
     }
-    times
+    (times, prompts)
 }
 
 /// The registry record for `pid`, only if it matches the live process start.
@@ -337,10 +358,30 @@ fn validate_record(
     };
     let collapsed = proc_start.split_whitespace().collect::<Vec<_>>().join(" ");
     let valid = recorded_pid == u64::from(pid)
-        && !start.is_empty()
-        && collapsed == start
-        && !session_id(&record).is_empty();
+        && !session_id(&record).is_empty()
+        && ((!start.is_empty() && collapsed == start) || is_proc_start_match(pid, &collapsed));
     valid.then_some(record)
+}
+
+#[cfg(target_os = "linux")]
+fn is_proc_start_match(pid: u32, proc_start: &str) -> bool {
+    if proc_start.is_empty() || !proc_start.chars().all(|c| c.is_ascii_digit()) {
+        return false;
+    }
+    if let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        && let Some(rest) = stat.rfind(')').map(|idx| &stat[idx + 1..])
+    {
+        let fields: Vec<&str> = rest.split_whitespace().collect();
+        if let Some(starttime) = fields.get(19) {
+            return *starttime == proc_start;
+        }
+    }
+    false
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_proc_start_match(_pid: u32, _proc_start: &str) -> bool {
+    false
 }
 
 fn session_id(record: &Map<String, Value>) -> String {
@@ -548,16 +589,18 @@ mod tests {
 not json
 [1,2]
 {"display":"x","timestamp":-5,"sessionId":"neg"}"#;
-        let times = parse_history(claude, Kind::Claude, NOW);
+        let (times, prompts) = parse_history(claude, Kind::Claude, NOW);
         assert_eq!(times.len(), 1);
         assert_eq!(times["a"], 1793245783.96);
+        assert_eq!(prompts["a"], "hi");
 
         let codex = br#"{"session_id":"c","ts":1793224104,"text":"go"}
 {"session_id":"c","ts":1793224000,"text":"earlier"}
 {"session_id":"d","ts":1793224104,"text":"<subagent run"}"#;
-        let times = parse_history(codex, Kind::Codex, NOW);
+        let (times, prompts) = parse_history(codex, Kind::Codex, NOW);
         assert_eq!(times.len(), 1);
         assert_eq!(times["c"], 1793224104.0);
+        assert_eq!(prompts["c"], "go");
     }
 
     #[test]
@@ -566,16 +609,16 @@ not json
         let path = t.path().join("history.jsonl");
         let record = br#"{"session_id":"ok","ts":1,"text":"go"}"#;
         fs::write(&path, record).unwrap();
-        assert_eq!(read_history(t.path(), Kind::Codex, NOW).1, "complete");
+        assert_eq!(read_history(t.path(), Kind::Codex, NOW).2, "complete");
         let mut big = vec![b'x'; HISTORY_LIMIT as usize];
         big.push(b'\n');
         big.extend_from_slice(record);
         fs::write(&path, &big).unwrap();
-        let (times, status) = read_history(t.path(), Kind::Codex, NOW);
+        let (times, _, status) = read_history(t.path(), Kind::Codex, NOW);
         assert_eq!(status, "tail");
         assert_eq!(times, HashMap::from([("ok".into(), 1.0)]));
         assert_eq!(
-            read_history(t.path().join("missing").as_path(), Kind::Codex, NOW).1,
+            read_history(t.path().join("missing").as_path(), Kind::Codex, NOW).2,
             "unavailable"
         );
     }
@@ -614,6 +657,20 @@ not json
         assert!(validate_record(record(8, start, "s"), 7, start).is_none());
         assert!(validate_record(record(7, start, ""), 7, start).is_none());
         assert!(validate_record(record(7, start, "s"), 7, "").is_none());
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn validate_record_matches_linux_proc_start() {
+        let pid = std::process::id();
+        if let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            && let Some(rest) = stat.rfind(')').map(|idx| &stat[idx + 1..])
+        {
+            let fields: Vec<&str> = rest.split_whitespace().collect();
+            if let Some(starttime) = fields.get(19) {
+                assert!(validate_record(record(u64::from(pid), starttime, "s"), pid, "").is_some());
+            }
+        }
     }
 
     #[test]

@@ -6,6 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::Line;
 use ratatui::widgets::ListState;
 
+use super::PreviewResult;
 use super::ansi;
 use super::matcher::{Filter, Haystack};
 use super::search::{Hit, Hits, Request};
@@ -60,6 +61,10 @@ pub struct App {
     pub list: ListState,
     pub preview_pane: String,
     pub preview: Vec<Line<'static>>,
+    /// Whether user prefers terminal preview over conversation transcript with `t`.
+    pub preview_terminal: bool,
+    /// Whether the current preview is a terminal capture (as opposed to conversation).
+    pub preview_is_terminal: bool,
     pub scanning: bool,
     /// A background failure to show in the status line.
     pub error: Option<String>,
@@ -94,6 +99,8 @@ impl App {
             list: ListState::default(),
             preview_pane: String::new(),
             preview: Vec::new(),
+            preview_terminal: false,
+            preview_is_terminal: false,
             scanning: false,
             error: None,
             // The picker opens with an empty query, so typing filters at once.
@@ -200,6 +207,34 @@ impl App {
     pub fn set_preview(&mut self, pane: String, text: &str) {
         self.preview = ansi::to_lines(text);
         self.preview_pane = pane;
+        self.preview_is_terminal = true;
+    }
+
+    pub fn set_preview_result(&mut self, result: PreviewResult) {
+        match result {
+            PreviewResult::Terminal { pane, text } => {
+                self.set_preview(pane, &text);
+            }
+            PreviewResult::Conversation {
+                pane,
+                lines,
+                prompt,
+            } => {
+                self.preview = lines;
+                self.preview_pane = pane.clone();
+                self.preview_is_terminal = false;
+                if !prompt.is_empty()
+                    && let Some(a) = self.agents.iter_mut().find(|a| a.pane == pane)
+                {
+                    if a.first_msg.is_empty() {
+                        a.first_msg = prompt.clone();
+                    }
+                    if a.name.is_empty() || a.name == "-" {
+                        a.name = mnemoloom::session::message::display_title(&prompt);
+                    }
+                }
+            }
+        }
     }
 
     /// An agent is shown when no `!exclusion` and every `~fuzzy` term allow
@@ -329,6 +364,11 @@ impl App {
             KeyCode::Char('g') | KeyCode::Home => self.step(isize::MIN),
             KeyCode::Char('G') | KeyCode::End => self.step(isize::MAX),
             KeyCode::Char('r') => Action::Refresh,
+            KeyCode::Char('t') => {
+                self.preview_terminal = !self.preview_terminal;
+                self.preview_pane.clear();
+                Action::None
+            }
             KeyCode::Char('p') => {
                 self.preview_choice = Some(!self.show_preview());
                 Action::None
@@ -486,6 +526,11 @@ mod tests {
         app.on_key(key(KeyCode::Char('g')));
         assert_eq!(app.selected_pane(), Some("a:1.1"));
         assert_eq!(app.on_key(key(KeyCode::Char('r'))), Action::Refresh);
+        assert!(!app.preview_terminal);
+        app.on_key(key(KeyCode::Char('t')));
+        assert!(app.preview_terminal);
+        app.on_key(key(KeyCode::Char('t')));
+        assert!(!app.preview_terminal);
         app.on_key(key(KeyCode::Char('p')));
         assert_eq!(app.preview_choice, Some(false));
         app.on_key(key(KeyCode::Char('?')));
@@ -700,5 +745,24 @@ mod tests {
         assert_eq!(app.on_key(key(KeyCode::Esc)), Action::None);
         assert!(app.theme_picker.is_none());
         assert_eq!(mnemoloom::theme::current_name(), "gruvbox-dark");
+    }
+
+    #[test]
+    fn preview_result_populates_prompt_and_switches_mode() {
+        let mut app = App::new(vec![agent("a:1.1", State::Idle, "-")]);
+        app.set_preview_result(PreviewResult::Conversation {
+            pane: "a:1.1".into(),
+            lines: vec![Line::raw("hello")],
+            prompt: "my prompt".into(),
+        });
+        assert!(!app.preview_is_terminal);
+        assert_eq!(app.agents[0].first_msg, "my prompt");
+        assert_eq!(app.agents[0].name, "my prompt");
+
+        app.set_preview_result(PreviewResult::Terminal {
+            pane: "a:1.1".into(),
+            text: "term".into(),
+        });
+        assert!(app.preview_is_terminal);
     }
 }

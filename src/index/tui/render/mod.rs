@@ -230,7 +230,7 @@ fn bar(on: bool) -> Span<'static> {
     }
 }
 
-pub(super) fn agent_color(agent: Agent) -> ratatui::style::Color {
+pub fn agent_color(agent: Agent) -> ratatui::style::Color {
     let p = theme::palette();
     match agent {
         Agent::Claude => p.claude,

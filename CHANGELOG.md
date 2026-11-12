@@ -6,6 +6,19 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-12
+
+### Added
+
+- Conversation preview formatting: show initial user prompt, `...`, and the last 2-3 messages in `search -g` and `mux` previews.
+- Initial message / prompt displayed in `mux` agent row list and preview header when custom name is absent.
+- `t` key in `mux` to toggle between conversation transcript preview and live tmux terminal capture.
+- `mux` preview box header indicating `CONVERSATION` vs `TERMINAL` mode.
+
+### Fixed
+
+- Linux Claude Code process validation in `mux`: match `/proc/<pid>/stat` field 22 clock ticks against `procStart` in `~/.claude/sessions/<pid>.json`.
+
 ## [0.4.0] - 2026-11-11
 
 ### Added
@@ -46,7 +59,8 @@ This project uses [Semantic Versioning](https://semver.org/).
 - `mux`: list and jump to coding agents in tmux panes, with a live preview.
 - Claude Code plugin with the `>resume`, `>session` and `>trim` prompt hooks, a session-search agent and skills.
 
-[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.1.0...v0.2.0

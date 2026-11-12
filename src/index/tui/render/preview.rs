@@ -214,10 +214,13 @@ fn transcript(v: &ViewState, height: u16) -> Vec<Line<'static>> {
             Kind::User => (Style::new().fg(theme::palette().ok), theme::text()),
             Kind::Assistant => (Style::new().fg(agent_color(agent)), theme::text()),
             Kind::Tool => (theme::dim(), theme::dim()),
+            Kind::Plain if line.text == "..." || line.text == "···" => {
+                (theme::dim(), theme::dim())
+            }
             Kind::Plain => (theme::dim(), theme::text()),
         };
         let mut spans_out = Vec::new();
-        if line.kind != Kind::Plain {
+        if line.kind != Kind::Plain || line.text == "..." || line.text == "···" {
             let gutter = if line.first && row.first {
                 format!("{:>w$} ", label(line.kind, agent), w = GUTTER - 1)
             } else {
