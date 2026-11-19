@@ -9,8 +9,10 @@ use super::paths::resolve;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
 pub enum SortKey {
-    /// Current state (urgency), as scanned.
+    /// Most recent known submitted input first, unknown last.
     #[default]
+    Newest,
+    /// Current state (urgency), then most recent known submitted input.
     State,
     /// Oldest known submitted input first, unknown last.
     Oldest,
@@ -26,6 +28,46 @@ pub struct View {
     pub sort: SortKey,
 }
 
+/// Sort `agents` according to `sort`.
+pub fn sort_agents(agents: &mut [Agent], sort: SortKey) {
+    let newest_cmp = |a: &Agent, b: &Agent| {
+        a.last_input_at
+            .is_none()
+            .cmp(&b.last_input_at.is_none())
+            .then_with(|| {
+                b.last_input_at
+                    .unwrap_or(0.0)
+                    .total_cmp(&a.last_input_at.unwrap_or(0.0))
+            })
+    };
+    match sort {
+        SortKey::Newest => {
+            agents.sort_by(|a, b| {
+                newest_cmp(a, b)
+                    .then_with(|| (a.state.rank(), &a.pane).cmp(&(b.state.rank(), &b.pane)))
+            });
+        }
+        SortKey::State => {
+            agents.sort_by(|a, b| {
+                a.state
+                    .rank()
+                    .cmp(&b.state.rank())
+                    .then_with(|| newest_cmp(a, b))
+                    .then_with(|| a.pane.cmp(&b.pane))
+            });
+        }
+        SortKey::Oldest => {
+            agents.sort_by(|a, b| {
+                let key = |x: &Agent| (x.last_input_at.is_none(), x.last_input_at.unwrap_or(0.0));
+                let (ka, kb) = (key(a), key(b));
+                ka.0.cmp(&kb.0)
+                    .then(ka.1.total_cmp(&kb.1))
+                    .then_with(|| a.pane.cmp(&b.pane))
+            });
+        }
+    }
+}
+
 /// Refresh ages (cached rows too), then filter and order.
 pub fn display(agents: Vec<Agent>, view: &View, now: f64) -> Vec<Agent> {
     let mut agents = select_agents(agents, view.repo.as_deref(), view.dir.as_deref());
@@ -35,15 +77,7 @@ pub fn display(agents: Vec<Agent>, view: &View, now: f64) -> Vec<Agent> {
     if view.dormant {
         agents.retain(|a| a.inactivity == Inactivity::Dormant);
     }
-    if view.sort == SortKey::Oldest {
-        agents.sort_by(|a, b| {
-            let key = |x: &Agent| (x.last_input_at.is_none(), x.last_input_at.unwrap_or(0.0));
-            let (ka, kb) = (key(a), key(b));
-            ka.0.cmp(&kb.0)
-                .then(ka.1.total_cmp(&kb.1))
-                .then_with(|| a.pane.cmp(&b.pane))
-        });
-    }
+    sort_agents(&mut agents, view.sort);
     agents
 }
 
@@ -77,7 +111,7 @@ pub fn select_agents(agents: Vec<Agent>, repo: Option<&str>, dir: Option<&Path>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mux::model::Kind;
+    use crate::mux::model::{Kind, State};
     use std::fs;
 
     fn agent(pane: &str, cwd: &str, last: Option<f64>) -> Agent {
@@ -87,13 +121,19 @@ mod tests {
         a
     }
 
+    fn agent_with_state(pane: &str, state: State, last: Option<f64>) -> Agent {
+        let mut a = agent(pane, "", last);
+        a.state = state;
+        a
+    }
+
     fn view() -> View {
         View {
             repo: None,
             dir: None,
             dormant: false,
             dormant_hours: 72.0,
-            sort: SortKey::State,
+            sort: SortKey::default(),
         }
     }
 
@@ -151,25 +191,37 @@ mod tests {
     }
 
     #[test]
-    fn oldest_sort_puts_unknown_last() {
+    fn newest_sort_is_default_descending_by_time_and_unknown_last() {
         let agents = vec![
-            agent("z", "", None),
-            agent("b", "", Some(50.0)),
-            agent("a", "", Some(50.0)),
-            agent("c", "", Some(10.0)),
-            agent("y", "", None),
+            agent_with_state("z", State::Idle, None),
+            agent_with_state("b", State::Busy, Some(50.0)),
+            agent_with_state("a", State::Idle, Some(50.0)),
+            agent_with_state("c", State::Input, Some(10.0)),
+            agent_with_state("d", State::Idle, Some(90.0)),
+            agent_with_state("y", State::Busy, None),
         ];
-        let v = View {
+        // Default (Newest): 90 -> 50 (Busy before Idle) -> 10 -> None (Busy before Idle).
+        assert_eq!(
+            panes(&display(agents.clone(), &view(), 100.0)),
+            ["d", "b", "a", "c", "y", "z"]
+        );
+        // Oldest: 10 -> 50 (pane a before b) -> 90 -> None (pane y before z).
+        let oldest = View {
             sort: SortKey::Oldest,
             ..view()
         };
         assert_eq!(
-            panes(&display(agents.clone(), &v, 100.0)),
-            ["c", "a", "b", "y", "z"]
+            panes(&display(agents.clone(), &oldest, 100.0)),
+            ["c", "a", "b", "d", "y", "z"]
         );
+        // State: Input (c) -> Busy (b 50, y None) -> Idle (d 90, a 50, z None).
+        let by_state = View {
+            sort: SortKey::State,
+            ..view()
+        };
         assert_eq!(
-            panes(&display(agents, &view(), 100.0)),
-            ["z", "b", "a", "c", "y"]
+            panes(&display(agents, &by_state, 100.0)),
+            ["c", "b", "y", "d", "a", "z"]
         );
     }
 

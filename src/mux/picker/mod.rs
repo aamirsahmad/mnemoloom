@@ -1,4 +1,4 @@
-//! Native interactive picker: urgency-ordered rows, type-to-filter over
+//! Native interactive picker: time-ordered rows (newest first), type-to-filter over
 //! metadata and conversations (see [`matcher`], [`search`]), a live preview
 //! of the highlighted pane, and a background rescan.
 

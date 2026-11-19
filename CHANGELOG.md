@@ -6,6 +6,12 @@ This project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-11-18
+
+### Fixed
+
+- `mux`: sort agents in descending order by last submitted input time (latest first, unknown last) by default, matching `search -g`. Added `--sort newest` (default) while keeping `--sort state` and `--sort oldest`.
+
 ## [0.4.1] - 2026-11-12
 
 ### Added
@@ -59,7 +65,8 @@ This project uses [Semantic Versioning](https://semver.org/).
 - `mux`: list and jump to coding agents in tmux panes, with a live preview.
 - Claude Code plugin with the `>resume`, `>session` and `>trim` prompt hooks, a session-search agent and skills.
 
-[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/aamirsahmad/mnemoloom/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/aamirsahmad/mnemoloom/compare/v0.2.0...v0.3.0

@@ -5,6 +5,7 @@
 
 use super::activity;
 use super::detect::{self, classify_argv};
+use super::filters::{SortKey, sort_agents};
 use super::git::GitReader;
 use super::model::{Agent, Kind};
 use super::procs::{self, Snapshot};
@@ -18,7 +19,7 @@ struct Candidate {
     argv: String,
 }
 
-/// Live agents sorted by urgency, then pane (plain string order).
+/// Live agents sorted by most recent submitted input first, unknown last.
 pub fn scan(now: f64) -> Vec<Agent> {
     let panes = tmux::list_panes();
     if panes.is_empty() {
@@ -44,7 +45,7 @@ pub fn scan(now: f64) -> Vec<Agent> {
     );
     let mut agents = assemble_all(candidates, screens);
     activity::enrich(&mut agents, &snapshot, &open, now);
-    agents.sort_by(|a, b| (a.state.rank(), &a.pane).cmp(&(b.state.rank(), &b.pane)));
+    sort_agents(&mut agents, SortKey::Newest);
     agents
 }
 

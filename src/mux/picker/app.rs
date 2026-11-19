@@ -43,7 +43,7 @@ pub struct App {
     pub query: String,
     filter: Filter,
     /// Indices into `agents` that match `query`: best match first, then
-    /// urgency order.
+    /// display order.
     pub visible: Vec<usize>,
     /// Conversation hits for `query`, by lowercase session id.
     hits: Hits,
@@ -240,7 +240,7 @@ impl App {
     /// An agent is shown when no `!exclusion` and every `~fuzzy` term allow
     /// it, and either every plain term matches its metadata or its
     /// conversation matches them all. Rank: conversation score plus
-    /// [`META_BONUS`] for a metadata match; ties keep urgency order.
+    /// [`META_BONUS`] for a metadata match; ties keep display order.
     fn refilter(&mut self, keep: Option<&str>) {
         let mut ranked: Vec<(f64, usize)> = (0..self.agents.len())
             .filter_map(|i| {
@@ -251,7 +251,7 @@ impl App {
                 shown.then(|| (bonus + hit.map_or(0.0, |h| h.score), i))
             })
             .collect();
-        // Stable: equal scores keep urgency order.
+        // Stable: equal scores keep display order.
         ranked.sort_by(|a, b| b.0.total_cmp(&a.0));
         self.visible = ranked.into_iter().map(|(_, i)| i).collect();
         let position = keep.and_then(|pane| {

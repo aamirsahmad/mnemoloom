@@ -747,7 +747,7 @@ mod tests {
             opencode_home: Some(dir.path().join("opencode")),
             agy_home: Some(dir.path().join("agy")),
         };
-        export(
+        let _ = export(
             &global,
             &ExportArgs {
                 session: Some(path.to_str().unwrap().to_string()),
@@ -784,7 +784,7 @@ mod tests {
         };
         for (id, agent) in [(PI_ID, "pi"), (OPENCODE_ID, "opencode"), (AGY_ID, "agy")] {
             let out = dir.path().join(format!("{agent}.txt"));
-            export(
+            let _ = export(
                 &global,
                 &ExportArgs {
                     session: Some(id.to_string()),

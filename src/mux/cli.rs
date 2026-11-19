@@ -65,8 +65,8 @@ pub struct ViewArgs {
     #[arg(long, value_name = "H", default_value = "72", hide_default_value = true,
           value_parser = finite_seconds)]
     pub dormant_hours: f64,
-    /// Sort by current state or oldest known submitted input
-    #[arg(long, value_enum, default_value_t = SortKey::State)]
+    /// Sort by most recent submitted input, current state, or oldest input
+    #[arg(long, value_enum, default_value_t = SortKey::Newest)]
     pub sort: SortKey,
 }
 
@@ -204,7 +204,7 @@ mod tests {
             &["list", "--dormant-hours", "nan"],
             &["bogus"],
             &["list", "--dir", "/definitely/not/here"],
-            &["list", "--sort", "newest"],
+            &["list", "--sort", "bogus"],
         ] {
             let err = parse(args).unwrap_err();
             assert!(err.use_stderr(), "{args:?}");
@@ -213,6 +213,9 @@ mod tests {
 
     #[test]
     fn subcommand_flags() {
+        assert_eq!(pick(&[]).1.sort, SortKey::Newest);
+        assert_eq!(pick(&["--sort", "state"]).1.sort, SortKey::State);
+        assert_eq!(pick(&["--sort", "newest"]).1.sort, SortKey::Newest);
         let cli = parse(&[
             "list",
             "--json",
@@ -230,6 +233,10 @@ mod tests {
         assert!(list.json && list.cached && !list.no_color);
         assert_eq!(list.view.sort, SortKey::Oldest);
         assert_eq!(list.view.dormant_hours, 72.0);
+        let Command::List(default_list) = parse(&["list"]).unwrap().command else {
+            panic!("not list")
+        };
+        assert_eq!(default_list.view.sort, SortKey::Newest);
         assert_eq!(pick(&["--dir", "/"]).1.dir, Some(PathBuf::from("/")));
         assert!(parse(&["rows"]).is_err());
     }
