@@ -24,7 +24,7 @@ memchr = "2.8.3"
 ratatui = "0.30.2"
 rayon = "1.12.0"
 regex = "1.13.1"
-rusqlite = { version = "0.41.1", features = ["bundled"] }
+rusqlite = { version = "0.43.0", features = ["bundled"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order", "float_roundtrip"] }
 tantivy = "0.27.0"
