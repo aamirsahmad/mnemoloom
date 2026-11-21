@@ -9,6 +9,10 @@ mnemoloom is one fast binary for macOS and Linux. It has no runtime dependencies
 ![CI](https://github.com/aamirsahmad/mnemoloom/actions/workflows/ci.yml/badge.svg)
 [![crates.io](https://img.shields.io/crates/v/mnemoloom.svg)](https://crates.io/crates/mnemoloom)
 
+![mnemoloom demo](docs/demo.gif)
+
+*[Full 60 fps screencast (MP4)](docs/demo.mp4)*
+
 ## Features
 
 - **Search.** Full-text search over all Claude Code, Codex, pi, opencode and agy sessions. Use the terminal UI, or get JSON lines for scripts and agents.
@@ -106,6 +110,8 @@ Run `mnemoloom <command> --help` for all options.
 
 `mnemoloom search` opens three panes: **Filters**, **Results** and **Preview**.
 
+![mnemoloom search -g](docs/search.png)
+
 | Key | Action |
 |---|---|
 | `/` | Edit the query. |
@@ -135,6 +141,8 @@ Each line is one session. The `lines` field is the number of user messages.
 
 `mnemoloom mux` lists every Claude Code, Codex, pi, opencode and agy agent in your tmux panes.
 It shows the state of each agent: `busy`, `bg`, `input` or `idle`.
+
+![mnemoloom mux](docs/mux.png)
 
 | Key | Action |
 |---|---|
@@ -208,6 +216,8 @@ Type these words as a prompt:
 ### Themes (`config.toml`)
 
 Press `Ctrl-O` in any TUI (`search`, `menu`, `mux`) to preview and save a colour theme, or use the CLI:
+
+![mnemoloom theme picker](docs/themes.png)
 
 ```bash
 mnemoloom theme              # list built-in and custom themes
